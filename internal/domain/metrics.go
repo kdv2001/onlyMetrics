@@ -26,7 +26,8 @@ func (mt MetricType) String() string {
 }
 
 type MetricValue struct {
-	Type  MetricType
-	Name  string
-	Value float64
+	Type         MetricType
+	Name         string
+	CounterValue int64
+	GaugeValue   float64
 }

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -35,17 +36,33 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mValue, err := strconv.ParseFloat(r.PathValue(ValuePathKey), 64)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	v := domain.MetricValue{
-		Type:  t,
-		Name:  r.PathValue(MetricNamePathKey),
-		Value: mValue,
+	var v domain.MetricValue
+	switch t {
+	case domain.GaugeMetricType:
+		mValue, err := strconv.ParseFloat(r.PathValue(ValuePathKey), 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		v = domain.MetricValue{
+			Type:       t,
+			Name:       r.PathValue(MetricNamePathKey),
+			GaugeValue: mValue,
+		}
+	case domain.CounterMetricType:
+		mValue, err := strconv.ParseInt(r.PathValue(ValuePathKey), 10, 64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		v = domain.MetricValue{
+			Type:         t,
+			Name:         r.PathValue(MetricNamePathKey),
+			CounterValue: mValue,
+		}
 	}
 
+	log.Print(v)
 	err = h.metricUseCases.UpdateMetric(r.Context(), v)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
