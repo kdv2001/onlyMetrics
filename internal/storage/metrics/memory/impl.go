@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
@@ -31,10 +32,32 @@ func (s *Storage) UpdateGauge(_ context.Context, value domain.MetricValue) error
 }
 
 func (s *Storage) UpdateCounter(_ context.Context, value domain.MetricValue) error {
-	s.gaugeMu.Lock()
+	s.counterMu.Lock()
 	v := s.counter[value.Name]
 	s.counter[value.Name] = v + value.CounterValue
-	s.gaugeMu.Unlock()
+	s.counterMu.Unlock()
 
 	return nil
+}
+
+func (s *Storage) GetGaugeValue(_ context.Context, name string) (float64, error) {
+	s.gaugeMu.RLock()
+	defer s.gaugeMu.RUnlock()
+	val, exist := s.gauge[name]
+	if !exist {
+		return 0, fmt.Errorf("err get gauge: %w", domain.ErrNotFound)
+	}
+
+	return val, nil
+}
+
+func (s *Storage) GetCounterValue(_ context.Context, name string) (int64, error) {
+	s.counterMu.RLock()
+	defer s.counterMu.RUnlock()
+	val, exist := s.counter[name]
+	if !exist {
+		return 0, fmt.Errorf("err get counter: %w", domain.ErrNotFound)
+	}
+
+	return val, nil
 }
