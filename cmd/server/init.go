@@ -13,6 +13,8 @@ import (
 )
 
 func initService() error {
+	parsedFlags := initFlags()
+
 	metricsStorage := memory.NewStorage()
 	metricsUC := metrics.NewUseCases(metricsStorage)
 
@@ -31,6 +33,7 @@ func initService() error {
 		sericeHttp.MetricNamePathKey,
 	), httpHandlers.GetMetric)
 
-	log.Print("serving metrics on port 8080")
-	return http.ListenAndServe(":8080", chiMux)
+	log.Print("serving metrics on port ", parsedFlags.serverAddr)
+
+	return http.ListenAndServe(parsedFlags.serverAddr, chiMux)
 }

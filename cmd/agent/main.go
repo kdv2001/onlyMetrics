@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"time"
 
 	metricsHTTP "github.com/kdv2001/onlyMetrics/internal/clients/metrics/http"
@@ -14,11 +13,11 @@ func main() {
 	httpClient := &http.Client{
 		Timeout: time.Second * 5,
 	}
-	metric := agent.NewMetricsUpdater(time.Second * 2)
-	metricsHTTPClient := metricsHTTP.NewClient(httpClient, url.URL{
-		Scheme: "http",
-		Path:   "localhost:8080",
-	})
-	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, time.Second*10)
+
+	parsedFlags := initFlags()
+
+	metric := agent.NewMetricsUpdater(parsedFlags.pollInterval)
+	metricsHTTPClient := metricsHTTP.NewClient(httpClient, parsedFlags.serverAddr)
+	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, parsedFlags.reportInterval)
 	_ = metricsUC.SendMetrics(context.TODO())
 }
