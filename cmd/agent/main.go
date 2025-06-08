@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -14,7 +15,10 @@ func main() {
 		Timeout: time.Second * 5,
 	}
 
-	parsedFlags := initFlags()
+	parsedFlags, err := initFlags()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	metric := agent.NewMetricsUpdater(parsedFlags.pollInterval)
 	metricsHTTPClient := metricsHTTP.NewClient(httpClient, parsedFlags.serverAddr)

@@ -53,26 +53,31 @@ func (u *UseCase) sendMetrics(ctx context.Context) {
 	t := time.NewTicker(u.sendInterval)
 	defer t.Stop()
 
-	for range t.C {
-		metrics := u.metricsClient.GetMetrics(ctx)
-		errs := make([]error, 0, len(metrics))
-		for _, metric := range metrics {
-			switch metric.Type {
-			case domain.CounterMetricType:
-				err := u.sendClient.SendCounter(ctx, metric)
-				if err != nil {
-					errs = append(errs, err)
-				}
-			case domain.GaugeMetricType:
-				err := u.sendClient.SendGauge(ctx, metric)
-				if err != nil {
-					errs = append(errs, err)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			metrics := u.metricsClient.GetMetrics(ctx)
+			errs := make([]error, 0, len(metrics))
+			for _, metric := range metrics {
+				switch metric.Type {
+				case domain.CounterMetricType:
+					err := u.sendClient.SendCounter(ctx, metric)
+					if err != nil {
+						errs = append(errs, err)
+					}
+				case domain.GaugeMetricType:
+					err := u.sendClient.SendGauge(ctx, metric)
+					if err != nil {
+						errs = append(errs, err)
+					}
 				}
 			}
-		}
 
-		if len(errs) > 0 {
-			log.Printf("error send metric: %v", errors.Join(errs...))
+			if len(errs) > 0 {
+				log.Printf("error send metric: %v", errors.Join(errs...))
+			}
 		}
 	}
 }

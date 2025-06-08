@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -14,20 +15,20 @@ type flags struct {
 	pollInterval   time.Duration
 }
 
-func initFlags() flags {
+func initFlags() (flags, error) {
 	scheme := "http"
 	serverAddr := url.URL{
 		Scheme: scheme,
 		Host:   "localhost:8080",
 	}
-	flag.Func("a", "metric server address", func(s string) error {
-		if s == "" {
+	flag.Func("a", "metric server address", func(address string) error {
+		if address == "" {
 			return nil
 		}
 
 		serverAddr = url.URL{
 			Scheme: scheme,
-			Host:   s,
+			Host:   address,
 		}
 
 		return nil
@@ -37,30 +38,58 @@ func initFlags() flags {
 
 	flag.Parse()
 
-	if value := os.Getenv("ADDRESS"); value != "" {
+	if value, exist := os.LookupEnv("ADDRESS"); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("ADDRESS environment variable not set")
+		}
+
 		serverAddr = url.URL{
 			Scheme: scheme,
 			Host:   value,
 		}
 	}
 
-	if value := os.Getenv("REPORT_INTERVAL"); value != "" {
-		intValue, err := strconv.ParseInt(value, 10, 64)
-		if err == nil {
-			reportInterval = &intValue
+	reportIntervalKey := "REPORT_INTERVAL"
+	if value, exist := os.LookupEnv(reportIntervalKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", reportIntervalKey)
 		}
+
+		val, err := parseIntervalValue(value)
+		if err != nil {
+			return flags{}, fmt.Errorf("failed to parse %s: %w", reportIntervalKey, err)
+		}
+		reportInterval = &val
 	}
 
-	if value := os.Getenv("POLL_INTERVAL"); value != "" {
-		intValue, err := strconv.ParseInt(value, 10, 64)
-		if err == nil {
-			pollInterval = &intValue
+	poolIntervalKey := "POLL_INTERVAL"
+	if value, exist := os.LookupEnv(poolIntervalKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", poolIntervalKey)
 		}
+
+		val, err := parseIntervalValue(value)
+		if err != nil {
+			return flags{}, fmt.Errorf("failed to parse %s: %w", poolIntervalKey, err)
+		}
+		pollInterval = &val
 	}
 
 	return flags{
 		serverAddr:     serverAddr,
 		reportInterval: time.Duration(*reportInterval) * time.Second,
 		pollInterval:   time.Duration(*pollInterval) * time.Second,
+	}, nil
+}
+
+func parseIntervalValue(value string) (int64, error) {
+	intValue, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse POLL_INTERVAL: %w", err)
 	}
+	if intValue <= 0 {
+		return 0, fmt.Errorf("invalid POLL_INTERVAL: %s", value)
+	}
+
+	return intValue, nil
 }
