@@ -29,16 +29,26 @@ func initService() error {
 	chiMux.Use(sericeHttp.AddLoggerToContextMiddleware(sugarLogger),
 		sericeHttp.ResponseMiddleware(), sericeHttp.RequestMiddleware())
 
-	chiMux.HandleFunc(fmt.Sprintf("/update/{%s}/{%s}/{%s}",
-		sericeHttp.MetricTypePathKey,
-		sericeHttp.MetricNamePathKey,
-		sericeHttp.ValuePathKey,
-	), httpHandlers.CollectMetric)
+	chiMux.Route("/update", func(r chi.Router) {
+		r.Post("/", httpHandlers.CollectBodyMetric)
+		r.Route(fmt.Sprintf("/{%s}/{%s}/{%s}",
+			sericeHttp.MetricTypePathKey,
+			sericeHttp.MetricNamePathKey,
+			sericeHttp.ValuePathKey,
+		), func(r chi.Router) {
+			r.Post("/", httpHandlers.CollectMetric)
+		})
+	})
 
-	chiMux.HandleFunc(fmt.Sprintf("/value/{%s}/{%s}",
-		sericeHttp.MetricTypePathKey,
-		sericeHttp.MetricNamePathKey,
-	), httpHandlers.GetMetric)
+	chiMux.Route("/value", func(r chi.Router) {
+		r.Post("/", httpHandlers.GetBodyMetric)
+		r.Route(fmt.Sprintf("/{%s}/{%s}",
+			sericeHttp.MetricTypePathKey,
+			sericeHttp.MetricNamePathKey,
+		), func(r chi.Router) {
+			r.Get("/", httpHandlers.GetMetric)
+		})
+	})
 
 	sugarLogger.Infof("serving metrics on port %s", parsedFlags.serverAddr)
 
