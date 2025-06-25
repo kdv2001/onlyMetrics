@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -68,7 +67,6 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Print(v)
 	err = h.metricUseCases.UpdateMetric(r.Context(), v)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
