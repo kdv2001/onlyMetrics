@@ -26,9 +26,14 @@ func initService() error {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
 	sugarLogger := log.Sugar()
-	chiMux.Use(sericeHttp.AddLoggerToContextMiddleware(sugarLogger),
-		sericeHttp.ResponseMiddleware(), sericeHttp.RequestMiddleware())
+	chiMux.Use(
+		sericeHttp.CompressMiddleware(sericeHttp.GetDefaultAcceptedEncodingData()),
+		sericeHttp.DecompressMiddleware(),
+		sericeHttp.AddLoggerToContextMiddleware(sugarLogger),
+		sericeHttp.ResponseMiddleware(),
+		sericeHttp.RequestMiddleware())
 
+	chiMux.Get("/", httpHandlers.GetAllMetric)
 	chiMux.Route("/update", func(r chi.Router) {
 		r.Post("/", httpHandlers.CollectBodyMetric)
 		r.Route(fmt.Sprintf("/{%s}/{%s}/{%s}",

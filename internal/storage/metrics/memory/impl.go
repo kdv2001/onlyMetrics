@@ -61,3 +61,26 @@ func (s *Storage) GetCounterValue(_ context.Context, name string) (int64, error)
 
 	return val, nil
 }
+
+// GetAllValues ...
+func (s *Storage) GetAllValues(_ context.Context) ([]domain.MetricValue, error) {
+	values := make([]domain.MetricValue, 0, len(s.gauge)+len(s.counter))
+	s.counterMu.RLock()
+	defer s.counterMu.RUnlock()
+	for n, v := range s.gauge {
+		values = append(values, domain.MetricValue{
+			Type:       domain.GaugeMetricType,
+			Name:       n,
+			GaugeValue: v,
+		})
+	}
+	for n, v := range s.counter {
+		values = append(values, domain.MetricValue{
+			Type:         domain.CounterMetricType,
+			Name:         n,
+			CounterValue: v,
+		})
+	}
+
+	return values, nil
+}

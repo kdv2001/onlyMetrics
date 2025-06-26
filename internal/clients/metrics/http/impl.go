@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -70,14 +71,32 @@ func (c *Client) send(ctx context.Context, value domain.MetricValue) error {
 type BodyClient struct {
 	client    httpClient
 	serverURL url.URL
+
+	withGzip bool
+}
+
+// clientOption опция клиента
+type clientOption func(c *BodyClient)
+
+// CompresGZIPOpt включает gzip сжатие
+func CompresGZIPOpt() clientOption {
+	return func(c *BodyClient) {
+		c.withGzip = true
+	}
 }
 
 // NewBodyClient ...
-func NewBodyClient(client httpClient, serverURL url.URL) *BodyClient {
-	return &BodyClient{
+func NewBodyClient(client httpClient, serverURL url.URL, opts ...clientOption) *BodyClient {
+	bc := &BodyClient{
 		client:    client,
 		serverURL: serverURL,
 	}
+
+	for _, opt := range opts {
+		opt(bc)
+	}
+
+	return bc
 }
 
 // SendGauge ...
@@ -118,13 +137,30 @@ func (c *BodyClient) send(ctx context.Context, value domain.MetricValue) error {
 		return err
 	}
 
-	buf := bytes.NewReader(b)
+	var buf *bytes.Buffer
+	switch {
+	case c.withGzip:
+		buf = bytes.NewBuffer(nil)
+		gzipWriter := gzip.NewWriter(buf)
+		_, err = gzipWriter.Write(b)
+		if err != nil {
+			return err
+		}
+		err = gzipWriter.Close()
+		if err != nil {
+			return err
+		}
+	default:
+		buf = bytes.NewBuffer(b)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sendMetricURL.String(), buf)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err

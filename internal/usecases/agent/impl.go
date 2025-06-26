@@ -143,16 +143,6 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
 		GaugeValue: m.randomValue.GetValue(),
 		Type:       domain.GaugeMetricType,
 	})
-	metrics = append(metrics, domain.MetricValue{
-		Name:       "NumGC",
-		GaugeValue: float64(m.stats.NumGC),
-		Type:       domain.GaugeMetricType,
-	})
-	metrics = append(metrics, domain.MetricValue{
-		Name:       "NumForcedGC",
-		GaugeValue: float64(m.stats.NumGC),
-		Type:       domain.GaugeMetricType,
-	})
 	m.mu.RUnlock()
 
 	return metrics
@@ -169,13 +159,14 @@ func (m *MetricsUpdater) updateMetrics() {
 func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
 	res := make([]domain.MetricValue, 0, 1)
 	for i := 0; i < v.NumField(); i++ {
-		// костыль, для этой метрики тип не соответствует названию метрики
-		if v.Type().Field(i).Name == "NumGC" ||
-			v.Type().Field(i).Name == "NumForcedGC" {
-			continue
-		}
 		switch {
 		case v.Type().Field(i).Type.Kind() == reflect.Uint64:
+			res = append(res, domain.MetricValue{
+				Name:       v.Type().Field(i).Name,
+				GaugeValue: float64(v.Field(i).Uint()),
+				Type:       domain.GaugeMetricType,
+			})
+		case v.Type().Field(i).Type.Kind() == reflect.Uint32:
 			res = append(res, domain.MetricValue{
 				Name:       v.Type().Field(i).Name,
 				GaugeValue: float64(v.Field(i).Uint()),

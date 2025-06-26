@@ -8,16 +8,19 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
+	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 )
 
 type useCases interface {
 	UpdateMetric(ctx context.Context, value domain.MetricValue) error
 	GetMetric(ctx context.Context, value domain.MetricType,
 		name string) (domain.MetricValue, error)
+	GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error)
 }
 
 type Handlers struct {
@@ -94,6 +97,8 @@ func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Infof(r.Context(), "Update %v", r.Header)
+	logger.Infof(r.Context(), "Update %v, %d", string(bodyBytes), len(bodyBytes))
 	var parsedMetric metric
 	if err = json.Unmarshal(bodyBytes, &parsedMetric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -174,6 +179,38 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
+	values, err := h.metricUseCases.GetAllMetrics(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error GetAllMetrics: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	resStrs := make([]string, 0, len(values))
+	for _, v := range values {
+		switch v.Type {
+		case domain.GaugeMetricType:
+			resStrs = append(resStrs,
+				fmt.Sprintf("%s %f", v.Name, v.GaugeValue),
+			)
+		default:
+			resStrs = append(resStrs,
+				fmt.Sprintf("%s %d", v.Name, v.CounterValue),
+			)
+		}
+	}
+
+	w.Header().Set(ContentType, TextHTML)
+	strings.Join(resStrs, "\n")
+	resSTR := "<html><body>" + strings.Join(resStrs, "\n") + "</body></html>"
+	_, err = w.Write([]byte(resSTR))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error write response: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // GetBodyMetric обработчик для получения метрик из тела запроса
 func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
@@ -183,6 +220,8 @@ func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	logger.Infof(r.Context(), "Get %v", r.Header)
+	logger.Infof(r.Context(), "Get %v, %d", string(bodyBytes), len(bodyBytes))
 	var parsedMetric metric
 	if err = json.Unmarshal(bodyBytes, &parsedMetric); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

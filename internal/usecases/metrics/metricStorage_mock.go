@@ -25,3 +25,7 @@ func (m *mockMetric) GetGaugeValue(_ context.Context, name string) (float64, err
 func (m *mockMetric) GetCounterValue(_ context.Context, name string) (int64, error) {
 	return 0, m.err
 }
+
+func (m *mockMetric) GetAllValues(_ context.Context) ([]domain.MetricValue, error) {
+	return nil, m.err
+}
