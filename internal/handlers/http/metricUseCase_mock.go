@@ -19,3 +19,7 @@ func (m *metricUseCaseMock) GetMetric(_ context.Context, _ domain.MetricType,
 	_ string) (domain.MetricValue, error) {
 	return m.value, m.err
 }
+
+func (m *metricUseCaseMock) GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error) {
+	return nil, nil
+}
