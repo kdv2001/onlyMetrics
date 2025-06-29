@@ -85,7 +85,7 @@ func initFlags() (flags, error) {
 func parseIntervalValue(value string) (int64, error) {
 	intValue, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse POLL_INTERVAL: %w", err)
+		return 0, fmt.Errorf("failed to parse %s: %w", value, err)
 	}
 	if intValue <= 0 {
 		return 0, fmt.Errorf("invalid POLL_INTERVAL: %s", value)

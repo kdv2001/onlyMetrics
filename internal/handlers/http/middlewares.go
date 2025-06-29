@@ -156,6 +156,7 @@ func AddLoggerToContextMiddleware(sugarLogger *zap.SugaredLogger) func(handler h
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
+
 			ctx = logger.ToContext(ctx, sugarLogger)
 			r = r.WithContext(ctx)
 

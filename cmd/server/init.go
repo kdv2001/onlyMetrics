@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -8,16 +9,23 @@ import (
 	"go.uber.org/zap"
 
 	sericeHttp "github.com/kdv2001/onlyMetrics/internal/handlers/http"
+	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/memory"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/metrics"
 )
 
 func initService() error {
-	parsedFlags := initFlags()
+	ctx := context.Background()
+	parsedFlags, err := initFlags()
+	if err != nil {
+		return fmt.Errorf("failed to init flags: %w", err)
+	}
 
-	metricsStorage := memory.NewStorage()
+	metricsStorage := memory.NewStorage(ctx, parsedFlags.fileStoragePath,
+		parsedFlags.storeInterval, parsedFlags.restoreData)
+	defer metricsStorage.Close(ctx)
+
 	metricsUC := metrics.NewUseCases(metricsStorage)
-
 	httpHandlers := sericeHttp.NewHandlers(metricsUC)
 
 	chiMux := chi.NewMux()
@@ -25,6 +33,7 @@ func initService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
+
 	sugarLogger := log.Sugar()
 	chiMux.Use(
 		sericeHttp.CompressMiddleware(sericeHttp.GetDefaultAcceptedEncodingData()),
@@ -55,7 +64,12 @@ func initService() error {
 		})
 	})
 
-	sugarLogger.Infof("serving metrics on port %s", parsedFlags.serverAddr)
+	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.serverAddr)
 
-	return http.ListenAndServe(parsedFlags.serverAddr, chiMux)
+	err = http.ListenAndServe(parsedFlags.serverAddr, chiMux)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

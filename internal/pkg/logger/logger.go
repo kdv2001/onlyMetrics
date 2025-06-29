@@ -21,14 +21,20 @@ func Infof(ctx context.Context, format string, args ...any) {
 	logger.Infof(format, args...)
 }
 
-var defaultSugarLogger = zap.NewNop().Sugar()
+// Errorf ...
+func Errorf(ctx context.Context, format string, args ...any) {
+	logger := FromContext(ctx)
+	logger.Errorf(format, args...)
+}
+
+var defaultSugarLogger, _ = zap.NewDevelopment()
 
 // FromContext извлекает logger из контекста
 func FromContext(ctx context.Context) *zap.SugaredLogger {
 	logger := ctx.Value(key)
 	sugarLogger, ok := logger.(*zap.SugaredLogger)
 	if !ok {
-		return defaultSugarLogger
+		return defaultSugarLogger.Sugar()
 	}
 
 	return sugarLogger
