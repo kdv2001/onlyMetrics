@@ -86,7 +86,27 @@ type MetricsUpdater struct {
 	mu          sync.RWMutex
 	stats       *runtime.MemStats
 	pollCount   atomic.Int64
-	randomValue atomic.Int64
+	randomValue Container[float64]
+}
+
+// Container ...
+type Container[T comparable] struct {
+	value T
+	mu    sync.RWMutex
+}
+
+// GetValue возвращает значение контейнера
+func (c *Container[T]) GetValue() T {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.value
+}
+
+// SetValue устанавливает новое значение контейнера
+func (c *Container[T]) SetValue(n T) {
+	c.mu.Lock()
+	c.value = n
+	c.mu.Unlock()
 }
 
 func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
@@ -94,7 +114,7 @@ func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
 		mu:          sync.RWMutex{},
 		stats:       &runtime.MemStats{},
 		pollCount:   atomic.Int64{},
-		randomValue: atomic.Int64{},
+		randomValue: Container[float64]{},
 	}
 
 	go func() {
@@ -119,9 +139,9 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
 		Type:         domain.CounterMetricType,
 	})
 	metrics = append(metrics, domain.MetricValue{
-		Name:         "RandomValue",
-		CounterValue: m.randomValue.Load(),
-		Type:         domain.CounterMetricType,
+		Name:       "RandomValue",
+		GaugeValue: m.randomValue.GetValue(),
+		Type:       domain.GaugeMetricType,
 	})
 	m.mu.RUnlock()
 
@@ -132,7 +152,7 @@ func (m *MetricsUpdater) updateMetrics() {
 	m.mu.Lock()
 	runtime.ReadMemStats(m.stats)
 	m.pollCount.Add(1)
-	m.randomValue.Swap(rand.Int63())
+	m.randomValue.SetValue(rand.Float64())
 	m.mu.Unlock()
 }
 
@@ -141,6 +161,12 @@ func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
 	for i := 0; i < v.NumField(); i++ {
 		switch {
 		case v.Type().Field(i).Type.Kind() == reflect.Uint64:
+			res = append(res, domain.MetricValue{
+				Name:       v.Type().Field(i).Name,
+				GaugeValue: float64(v.Field(i).Uint()),
+				Type:       domain.GaugeMetricType,
+			})
+		case v.Type().Field(i).Type.Kind() == reflect.Uint32:
 			res = append(res, domain.MetricValue{
 				Name:       v.Type().Field(i).Name,
 				GaugeValue: float64(v.Field(i).Uint()),
