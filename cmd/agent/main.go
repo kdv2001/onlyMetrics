@@ -21,7 +21,7 @@ func main() {
 	}
 
 	metric := agent.NewMetricsUpdater(parsedFlags.pollInterval)
-	metricsHTTPClient := metricsHTTP.NewClient(httpClient, parsedFlags.serverAddr)
+	metricsHTTPClient := metricsHTTP.NewBodyClient(httpClient, parsedFlags.serverAddr)
 	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, parsedFlags.reportInterval)
 	_ = metricsUC.SendMetrics(context.TODO())
 }
