@@ -8,18 +8,19 @@ import (
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 )
 
-type metricStorage interface {
+type MetricStorage interface {
 	UpdateGauge(_ context.Context, value domain.MetricValue) error
 	UpdateCounter(_ context.Context, value domain.MetricValue) error
 	GetGaugeValue(_ context.Context, name string) (float64, error)
 	GetCounterValue(_ context.Context, name string) (int64, error)
 	GetAllValues(_ context.Context) ([]domain.MetricValue, error)
+	Ping(ctx context.Context) error
 }
 type UseCases struct {
-	metricStorage metricStorage
+	metricStorage MetricStorage
 }
 
-func NewUseCases(metricStorage metricStorage) *UseCases {
+func NewUseCases(metricStorage MetricStorage) *UseCases {
 	return &UseCases{
 		metricStorage: metricStorage,
 	}
@@ -73,4 +74,9 @@ func (uc *UseCases) GetMetric(ctx context.Context, value domain.MetricType,
 	}
 
 	return domain.MetricValue{}, errors.New("unknown metric type")
+}
+
+// Ping ...
+func (uc *UseCases) Ping(ctx context.Context) error {
+	return uc.metricStorage.Ping(ctx)
 }

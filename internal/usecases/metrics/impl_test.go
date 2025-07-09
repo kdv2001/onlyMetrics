@@ -11,7 +11,7 @@ import (
 func TestUseCases_UpdateMetric(t *testing.T) {
 	t.Parallel()
 	type fields struct {
-		metricStorage metricStorage
+		metricStorage MetricStorage
 	}
 	type args struct {
 		in0   context.Context

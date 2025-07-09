@@ -13,6 +13,7 @@ type flags struct {
 	storeInterval   time.Duration
 	fileStoragePath string
 	restoreData     bool
+	postgresDSN     string
 }
 
 func initFlags() (flags, error) {
@@ -20,6 +21,7 @@ func initFlags() (flags, error) {
 	storeInterval := flag.Int64("i", 300, "The interval to save data to file")
 	fileStoragePath := flag.String("f", "data.txt", "The address to metric file")
 	restore := flag.Bool("r", false, "The flag to restore data from file")
+	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
 
 	flag.Parse()
 
@@ -63,11 +65,21 @@ func initFlags() (flags, error) {
 		restore = &res
 	}
 
+	dataBaseDSNKey := "DATABASE_DSN"
+	if value, exist := os.LookupEnv(dataBaseDSNKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", dataBaseDSNKey)
+		}
+
+		postgresDSN = &value
+	}
+
 	return flags{
 		serverAddr:      *serverAddr,
 		storeInterval:   time.Duration(*storeInterval) * time.Second,
 		fileStoragePath: *fileStoragePath,
 		restoreData:     *restore,
+		postgresDSN:     *postgresDSN,
 	}, nil
 }
 
