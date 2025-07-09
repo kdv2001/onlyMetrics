@@ -13,8 +13,8 @@ type metricStorage interface {
 	UpdateCounter(_ context.Context, value domain.MetricValue) error
 	GetGaugeValue(_ context.Context, name string) (float64, error)
 	GetCounterValue(_ context.Context, name string) (int64, error)
+	GetAllValues(_ context.Context) ([]domain.MetricValue, error)
 }
-
 type UseCases struct {
 	metricStorage metricStorage
 }
@@ -40,6 +40,10 @@ func (uc *UseCases) UpdateMetric(ctx context.Context, value domain.MetricValue) 
 	}
 
 	return nil
+}
+
+func (uc *UseCases) GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error) {
+	return uc.metricStorage.GetAllValues(ctx)
 }
 
 func (uc *UseCases) GetMetric(ctx context.Context, value domain.MetricType,
