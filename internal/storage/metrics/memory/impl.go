@@ -228,3 +228,8 @@ func (s *Storage) GetAllValues(_ context.Context) ([]domain.MetricValue, error) 
 
 	return values, nil
 }
+
+// Ping ...
+func (s *Storage) Ping(_ context.Context) error {
+	return nil
+}

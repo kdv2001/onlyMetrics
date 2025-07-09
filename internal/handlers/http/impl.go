@@ -21,6 +21,7 @@ type useCases interface {
 	GetMetric(ctx context.Context, value domain.MetricType,
 		name string) (domain.MetricValue, error)
 	GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error)
+	Ping(ctx context.Context) error
 }
 
 type Handlers struct {
@@ -269,6 +270,16 @@ func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write(b)
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
+	err := h.metricUseCases.Ping(r.Context())
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
