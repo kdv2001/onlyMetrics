@@ -9,11 +9,11 @@ import (
 )
 
 type MetricStorage interface {
-	UpdateGauge(_ context.Context, value domain.MetricValue) error
-	UpdateCounter(_ context.Context, value domain.MetricValue) error
-	GetGaugeValue(_ context.Context, name string) (float64, error)
-	GetCounterValue(_ context.Context, name string) (int64, error)
-	GetAllValues(_ context.Context) ([]domain.MetricValue, error)
+	UpdateGauge(ctx context.Context, value domain.MetricValue) error
+	UpdateCounter(ctx context.Context, value domain.MetricValue) error
+	GetGaugeValue(ctx context.Context, name string) (float64, error)
+	GetCounterValue(ctx context.Context, name string) (int64, error)
+	GetAllValues(ctx context.Context) ([]domain.MetricValue, error)
 	Ping(ctx context.Context) error
 }
 type UseCases struct {

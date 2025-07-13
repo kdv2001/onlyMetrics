@@ -192,18 +192,18 @@ func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 		switch v.Type {
 		case domain.GaugeMetricType:
 			resStrs = append(resStrs,
-				fmt.Sprintf("%s %f", v.Name, v.GaugeValue),
+				fmt.Sprintf("<br>%s %f</br>", v.Name, v.GaugeValue),
 			)
 		default:
 			resStrs = append(resStrs,
-				fmt.Sprintf("%s %d", v.Name, v.CounterValue),
+				fmt.Sprintf("<br>%s %d</br>", v.Name, v.CounterValue),
 			)
 		}
 	}
 
 	w.Header().Set(ContentType, TextHTML)
 	strings.Join(resStrs, "\n")
-	resSTR := "<html><body>" + strings.Join(resStrs, "\n") + "</body></html>"
+	resSTR := "<html><body>" + strings.Join(resStrs, "") + "</body></html>"
 	_, err = w.Write([]byte(resSTR))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error write response: %v", err), http.StatusInternalServerError)

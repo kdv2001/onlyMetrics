@@ -35,7 +35,10 @@ func initService() error {
 		if err != nil {
 			return err
 		}
-		postgresStorage := postgres.NewStorage(conn)
+		postgresStorage, err := postgres.NewStorage(ctx, conn)
+		if err != nil {
+			return err
+		}
 		defer postgresStorage.Close(ctx)
 		metricsStorage = postgresStorage
 	} else {
