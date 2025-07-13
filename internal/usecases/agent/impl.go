@@ -59,21 +59,6 @@ func (u *UseCase) sendMetrics(ctx context.Context) {
 			return
 		case <-t.C:
 			metrics := u.metricsClient.GetMetrics(ctx)
-			//errs := make([]error, 0, len(metrics))
-			//for _, metric := range metrics {
-			//	switch metric.Type {
-			//	case domain.CounterMetricType:
-			//		err := u.sendClient.SendCounter(ctx, metric)
-			//		if err != nil {
-			//			errs = append(errs, err)
-			//		}
-			//	case domain.GaugeMetricType:
-			//		err := u.sendClient.SendGauge(ctx, metric)
-			//		if err != nil {
-			//			errs = append(errs, err)
-			//		}
-			//	}
-			//}
 			err := u.sendClient.SendMetrics(ctx, metrics)
 			if err != nil {
 				log.Printf("error send metric: %v", err)

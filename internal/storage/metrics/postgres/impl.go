@@ -6,7 +6,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
@@ -62,6 +64,10 @@ func (s *Storage) UpdateGauge(ctx context.Context, value domain.MetricValue) err
 values ($1,   $2, $3, $4);`,
 		value.Name, value.GaugeValue, "single agent", time.Now().UTC())
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code) {
+			return domain.ErrResourceIsLocked
+		}
 		return err
 	}
 
@@ -74,6 +80,10 @@ func (s *Storage) UpdateCounter(ctx context.Context, value domain.MetricValue) e
 values ($1,   $2, $3, $4);`,
 		value.Name, value.CounterValue, "single agent", time.Now().UTC())
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code) {
+			return domain.ErrResourceIsLocked
+		}
 		return err
 	}
 
@@ -97,9 +107,12 @@ func (s *Storage) GetGaugeValue(ctx context.Context, name string) (float64, erro
 		`select * from values where metric_name = $1 order by created_at desc limit 1;`,
 		name).Scan(&res.ID, &res.MetricName, &res.GaugeValue, &res.CounterValue, &res.AgentName, &res.CreatedAt)
 	if err != nil {
+		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			return 0, domain.ErrNotFound
+		case errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code):
+			return 0, domain.ErrResourceIsLocked
 		}
 
 		return 0, err
@@ -113,9 +126,12 @@ func (s *Storage) GetCounterValue(ctx context.Context, name string) (int64, erro
 		`select sum(counter_value)  as counter_value from values where metric_name = $1;`,
 		name).Scan(&res)
 	if err != nil {
+		var pgErr *pgconn.PgError
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
 			return 0, domain.ErrNotFound
+		case errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code):
+			return 0, domain.ErrResourceIsLocked
 		}
 
 		return 0, err
@@ -135,6 +151,12 @@ where (metric_name, created_at) in
        group by values.metric_name) and gauge_value notnull;
 `)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code):
+			return nil, domain.ErrResourceIsLocked
+		}
+
 		return nil, err
 	}
 
@@ -161,6 +183,12 @@ from values where counter_value notnull
 group by metric_name;
 `)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		var pgErr *pgconn.PgError
+		switch {
+		case errors.As(err, &pgErr) && pgerrcode.IsInvalidTransactionInitiation(pgErr.Code):
+			return nil, domain.ErrResourceIsLocked
+		}
+
 		return nil, err
 	}
 

@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 )
+
+const retryNums = 3
 
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -233,16 +236,27 @@ func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricVal
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("internal server error")
+	var timeSleep time.Duration
+	for i := 0; i < retryNums; i++ {
+		time.Sleep(timeSleep)
+		resp, err := c.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+
+		switch resp.StatusCode {
+		case http.StatusLocked:
+			timeSleep = time.Duration(i*2+1) * time.Second
+			continue
+		case http.StatusOK:
+			return nil
+		default:
+			return fmt.Errorf("server error")
+		}
 	}
 
 	return nil

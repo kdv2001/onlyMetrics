@@ -77,6 +77,12 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 
 	err = h.metricUseCases.UpdateMetric(r.Context(), v)
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -114,6 +120,12 @@ func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 
 	err = h.metricUseCases.UpdateMetric(r.Context(), v)
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -131,7 +143,11 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 	val, err := h.metricUseCases.GetMetric(r.Context(), t, chi.URLParam(r, MetricNamePathKey))
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		case errors.Is(err, domain.ErrNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
@@ -152,6 +168,15 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	values, err := h.metricUseCases.GetAllMetrics(r.Context())
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		case errors.Is(err, domain.ErrNotFound):
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
 		http.Error(w, fmt.Sprintf("Error GetAllMetrics: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -206,7 +231,11 @@ func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 
 	val, err := h.metricUseCases.GetMetric(r.Context(), mType, parsedMetric.ID)
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		case errors.Is(err, domain.ErrNotFound):
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
@@ -280,6 +309,12 @@ func (h *Handlers) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 
 	err = h.metricUseCases.UpdateMetrics(r.Context(), res)
 	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrResourceIsLocked):
+			w.WriteHeader(http.StatusLocked)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
