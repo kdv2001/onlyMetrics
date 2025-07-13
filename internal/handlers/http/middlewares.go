@@ -173,7 +173,7 @@ func RequestMiddleware() func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			defer func() {
-				logger.Infof(r.Context(), "request: url: %s; method: %s; processing time: %s",
+				logger.Infof(r.Context(), "request: url: %s; method: %s; processing time: %s; body: %s",
 					r.URL.String(), r.Method, time.Since(start).String())
 			}()
 

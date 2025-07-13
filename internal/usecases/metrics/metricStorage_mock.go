@@ -30,6 +30,10 @@ func (m *mockMetric) GetAllValues(_ context.Context) ([]domain.MetricValue, erro
 	return nil, m.err
 }
 
+func (m *mockMetric) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
+	return m.err
+}
+
 func (m *mockMetric) Ping(_ context.Context) error {
 	return nil
 }

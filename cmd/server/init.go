@@ -71,6 +71,10 @@ func initService() error {
 		r.Get("/", httpHandlers.GetPing)
 	})
 
+	chiMux.Route("/updates", func(r chi.Router) {
+		r.Post("/", httpHandlers.UpdateMetrics)
+	})
+
 	chiMux.Route("/update", func(r chi.Router) {
 		r.Post("/", httpHandlers.CollectBodyMetric)
 		r.Route(fmt.Sprintf("/{%s}/{%s}/{%s}",

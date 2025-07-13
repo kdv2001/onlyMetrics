@@ -15,6 +15,7 @@ type MetricStorage interface {
 	GetCounterValue(ctx context.Context, name string) (int64, error)
 	GetAllValues(ctx context.Context) ([]domain.MetricValue, error)
 	Ping(ctx context.Context) error
+	UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error
 }
 type UseCases struct {
 	metricStorage MetricStorage
@@ -79,4 +80,8 @@ func (uc *UseCases) GetMetric(ctx context.Context, value domain.MetricType,
 // Ping ...
 func (uc *UseCases) Ping(ctx context.Context) error {
 	return uc.metricStorage.Ping(ctx)
+}
+
+func (uc *UseCases) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
+	return uc.metricStorage.UpdateMetrics(ctx, metrics)
 }

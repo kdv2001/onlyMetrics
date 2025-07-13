@@ -27,3 +27,7 @@ func (m *metricUseCaseMock) GetAllMetrics(ctx context.Context) ([]domain.MetricV
 func (m *metricUseCaseMock) Ping(_ context.Context) error {
 	return nil
 }
+
+func (m *metricUseCaseMock) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
+	return nil
+}

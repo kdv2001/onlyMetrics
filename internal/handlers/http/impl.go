@@ -22,6 +22,7 @@ type useCases interface {
 		name string) (domain.MetricValue, error)
 	GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error)
 	Ping(ctx context.Context) error
+	UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error
 }
 
 type Handlers struct {
@@ -98,49 +99,17 @@ func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Infof(r.Context(), "Update %v", r.Header)
-	logger.Infof(r.Context(), "Update %v, %d", string(bodyBytes), len(bodyBytes))
+	logger.Infof(r.Context(), "CollectBodyMetric: %s", string(bodyBytes))
 	var parsedMetric metric
 	if err = json.Unmarshal(bodyBytes, &parsedMetric); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var v domain.MetricValue
-	mType, err := domain.NewMetricTypeFromString(parsedMetric.MType)
-	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	switch mType {
-	case domain.GaugeMetricType:
-		var resValue float64
-		if parsedMetric.Value != nil {
-			resValue = *parsedMetric.Value
-		}
-
-		v = domain.MetricValue{
-			Type:       mType,
-			Name:       parsedMetric.ID,
-			GaugeValue: resValue,
-		}
-	case domain.CounterMetricType:
-		var resValue int64
-		if parsedMetric.Delta != nil {
-			resValue = *parsedMetric.Delta
-		}
-
-		if parsedMetric.Delta == nil {
-			http.Error(w, "counter value is empty", http.StatusBadRequest)
-			return
-		}
-
-		v = domain.MetricValue{
-			Type:         mType,
-			Name:         parsedMetric.ID,
-			CounterValue: resValue,
-		}
+	v, err := metricToDomain(parsedMetric)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	err = h.metricUseCases.UpdateMetric(r.Context(), v)
@@ -212,7 +181,7 @@ func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetBodyMetric обработчик для получения метрик из тела запроса
+// GetBodyMetric обработчик для получения метрик в теле запроса
 func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -282,4 +251,77 @@ func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handlers) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error reading body: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	logger.Infof(r.Context(), "UpdateMetrics: %s", string(bodyBytes))
+	var parsedMetrics []metric
+	if err = json.Unmarshal(bodyBytes, &parsedMetrics); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var res []domain.MetricValue
+	for _, parsedMetric := range parsedMetrics {
+		v, err := metricToDomain(parsedMetric)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		res = append(res, v)
+	}
+
+	err = h.metricUseCases.UpdateMetrics(r.Context(), res)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func metricToDomain(parsedMetric metric) (domain.MetricValue, error) {
+	mType, err := domain.NewMetricTypeFromString(parsedMetric.MType)
+	if err != nil {
+		return domain.MetricValue{}, err
+	}
+
+	var v domain.MetricValue
+	switch mType {
+	case domain.GaugeMetricType:
+		var resValue float64
+		if parsedMetric.Value != nil {
+			resValue = *parsedMetric.Value
+		}
+
+		v = domain.MetricValue{
+			Type:       mType,
+			Name:       parsedMetric.ID,
+			GaugeValue: resValue,
+		}
+	case domain.CounterMetricType:
+		var resValue int64
+		if parsedMetric.Delta != nil {
+			resValue = *parsedMetric.Delta
+		}
+
+		if parsedMetric.Delta == nil {
+			return domain.MetricValue{}, errors.New("counter value is empty")
+		}
+
+		v = domain.MetricValue{
+			Type:         mType,
+			Name:         parsedMetric.ID,
+			CounterValue: resValue,
+		}
+	}
+
+	return v, nil
 }
