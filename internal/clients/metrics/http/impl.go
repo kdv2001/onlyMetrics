@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -76,6 +79,7 @@ type BodyClient struct {
 	serverURL url.URL
 
 	withGzip bool
+	hh       func([]byte) ([]byte, error)
 }
 
 // clientOption опция клиента
@@ -85,6 +89,26 @@ type clientOption func(c *BodyClient)
 func CompresGZIPOpt() clientOption {
 	return func(c *BodyClient) {
 		c.withGzip = true
+	}
+}
+
+// WithSHA256Opt включает добавление подписи sha@56
+func WithSHA256Opt(key string) clientOption {
+	if key == "" {
+		return func(c *BodyClient) {
+			c.hh = nil
+		}
+	}
+
+	return func(c *BodyClient) {
+		c.hh = func(body []byte) ([]byte, error) {
+			hh := hmac.New(sha256.New, []byte(key))
+			if _, err := hh.Write(body); err != nil {
+				return nil, err
+
+			}
+			return hh.Sum(nil), nil
+		}
 	}
 }
 
@@ -236,6 +260,15 @@ func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricVal
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+
+	if c.hh != nil {
+		bufSHA, err := c.hh(buf.Bytes())
+		if err != nil {
+			return err
+		}
+		str := hex.EncodeToString(bufSHA)
+		req.Header.Set("HashSHA256", str)
+	}
 
 	var timeSleep time.Duration
 	for i := 0; i < retryNums; i++ {

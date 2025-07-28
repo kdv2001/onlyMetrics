@@ -14,6 +14,7 @@ type flags struct {
 	fileStoragePath string
 	restoreData     bool
 	postgresDSN     string
+	cryptKey        string
 }
 
 func initFlags() (flags, error) {
@@ -22,6 +23,7 @@ func initFlags() (flags, error) {
 	fileStoragePath := flag.String("f", "data.txt", "The address to metric file")
 	restore := flag.Bool("r", false, "The flag to restore data from file")
 	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
+	cryptKey := flag.String("k", "", "crypt request key")
 
 	flag.Parse()
 
@@ -74,12 +76,22 @@ func initFlags() (flags, error) {
 		postgresDSN = &value
 	}
 
+	cryptKeyKey := "KEY"
+	if value, exist := os.LookupEnv(cryptKeyKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", cryptKeyKey)
+		}
+
+		cryptKey = &value
+	}
+
 	return flags{
 		serverAddr:      *serverAddr,
 		storeInterval:   time.Duration(*storeInterval) * time.Second,
 		fileStoragePath: *fileStoragePath,
 		restoreData:     *restore,
 		postgresDSN:     *postgresDSN,
+		cryptKey:        *cryptKey,
 	}, nil
 }
 

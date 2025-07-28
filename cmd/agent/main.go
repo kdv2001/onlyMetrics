@@ -25,6 +25,7 @@ func main() {
 		httpClient,
 		parsedFlags.serverAddr,
 		metricsHTTP.CompresGZIPOpt(),
+		metricsHTTP.WithSHA256Opt(parsedFlags.cryptKey),
 	)
 	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, parsedFlags.reportInterval)
 	_ = metricsUC.SendMetrics(context.TODO())

@@ -56,6 +56,9 @@ func initService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
+	if parsedFlags.cryptKey != "" {
+		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.cryptKey))
+	}
 
 	sugarLogger := log.Sugar()
 	chiMux.Use(

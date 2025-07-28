@@ -13,6 +13,7 @@ type flags struct {
 	serverAddr     url.URL
 	reportInterval time.Duration
 	pollInterval   time.Duration
+	cryptKey       string
 }
 
 func initFlags() (flags, error) {
@@ -35,6 +36,7 @@ func initFlags() (flags, error) {
 	})
 	reportInterval := flag.Int64("r", 10, "report interval duration")
 	pollInterval := flag.Int64("p", 2, "report poll duration")
+	cryptKey := flag.String("k", "", "crypt request key")
 
 	flag.Parse()
 
@@ -75,10 +77,20 @@ func initFlags() (flags, error) {
 		pollInterval = &val
 	}
 
+	cryptKeyKey := "KEY"
+	if value, exist := os.LookupEnv(cryptKeyKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", cryptKeyKey)
+		}
+
+		cryptKey = &value
+	}
+
 	return flags{
 		serverAddr:     serverAddr,
 		reportInterval: time.Duration(*reportInterval) * time.Second,
 		pollInterval:   time.Duration(*pollInterval) * time.Second,
+		cryptKey:       *cryptKey,
 	}, nil
 }
 
