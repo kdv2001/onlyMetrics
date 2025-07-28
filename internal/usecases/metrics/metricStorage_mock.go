@@ -29,3 +29,11 @@ func (m *mockMetric) GetCounterValue(_ context.Context, name string) (int64, err
 func (m *mockMetric) GetAllValues(_ context.Context) ([]domain.MetricValue, error) {
 	return nil, m.err
 }
+
+func (m *mockMetric) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
+	return m.err
+}
+
+func (m *mockMetric) Ping(_ context.Context) error {
+	return nil
+}

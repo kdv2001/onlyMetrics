@@ -228,3 +228,29 @@ func (s *Storage) GetAllValues(_ context.Context) ([]domain.MetricValue, error) 
 
 	return values, nil
 }
+
+// Ping ...
+func (s *Storage) Ping(_ context.Context) error {
+	return nil
+}
+
+// UpdateMetrics ...
+func (s *Storage) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
+	errs := make([]error, 0)
+	for _, m := range metrics {
+		switch m.Type {
+		case domain.GaugeMetricType:
+			err := s.UpdateGauge(ctx, m)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		case domain.CounterMetricType:
+			err := s.UpdateCounter(ctx, m)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+
+	return errors.Join(errs...)
+}

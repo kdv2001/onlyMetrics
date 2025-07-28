@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"log"
 	"math/rand"
 	"reflect"
@@ -17,6 +16,7 @@ import (
 type sendClient interface {
 	SendGauge(ctx context.Context, value domain.MetricValue) error
 	SendCounter(ctx context.Context, value domain.MetricValue) error
+	SendMetrics(ctx context.Context, values []domain.MetricValue) error
 }
 
 type metricsClient interface {
@@ -59,24 +59,9 @@ func (u *UseCase) sendMetrics(ctx context.Context) {
 			return
 		case <-t.C:
 			metrics := u.metricsClient.GetMetrics(ctx)
-			errs := make([]error, 0, len(metrics))
-			for _, metric := range metrics {
-				switch metric.Type {
-				case domain.CounterMetricType:
-					err := u.sendClient.SendCounter(ctx, metric)
-					if err != nil {
-						errs = append(errs, err)
-					}
-				case domain.GaugeMetricType:
-					err := u.sendClient.SendGauge(ctx, metric)
-					if err != nil {
-						errs = append(errs, err)
-					}
-				}
-			}
-
-			if len(errs) > 0 {
-				log.Printf("error send metric: %v", errors.Join(errs...))
+			err := u.sendClient.SendMetrics(ctx, metrics)
+			if err != nil {
+				log.Printf("error send metric: %v", err)
 			}
 		}
 	}
