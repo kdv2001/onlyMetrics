@@ -10,10 +10,11 @@ import (
 )
 
 type flags struct {
-	serverAddr     url.URL
-	reportInterval time.Duration
-	pollInterval   time.Duration
-	cryptKey       string
+	serverAddr      url.URL
+	reportInterval  time.Duration
+	pollInterval    time.Duration
+	cryptKey        string
+	maxGoroutineNum int64
 }
 
 func initFlags() (flags, error) {
@@ -37,6 +38,7 @@ func initFlags() (flags, error) {
 	reportInterval := flag.Int64("r", 10, "report interval duration")
 	pollInterval := flag.Int64("p", 2, "report poll duration")
 	cryptKey := flag.String("k", "", "crypt request key")
+	maxGoroutineNum := flag.Int64("l", 0, "max goroutine sender num")
 
 	flag.Parse()
 
@@ -86,11 +88,26 @@ func initFlags() (flags, error) {
 		cryptKey = &value
 	}
 
+	maxGoroutineNumKey := "RATE_LIMIT"
+	if value, exist := os.LookupEnv(maxGoroutineNumKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", maxGoroutineNumKey)
+		}
+
+		intValue, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return flags{}, fmt.Errorf("failed to parse %s: %w", maxGoroutineNumKey, err)
+		}
+
+		maxGoroutineNum = &intValue
+	}
+
 	return flags{
-		serverAddr:     serverAddr,
-		reportInterval: time.Duration(*reportInterval) * time.Second,
-		pollInterval:   time.Duration(*pollInterval) * time.Second,
-		cryptKey:       *cryptKey,
+		serverAddr:      serverAddr,
+		reportInterval:  time.Duration(*reportInterval) * time.Second,
+		pollInterval:    time.Duration(*pollInterval) * time.Second,
+		cryptKey:        *cryptKey,
+		maxGoroutineNum: *maxGoroutineNum,
 	}, nil
 }
 

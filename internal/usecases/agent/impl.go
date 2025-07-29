@@ -10,6 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/mem"
+
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 )
 
@@ -26,22 +29,38 @@ type UseCase struct {
 	sendClient    sendClient
 	metricsClient metricsClient
 	sendInterval  time.Duration
+	workerNums    int64
 }
 
-func NewUseCase(sendClient sendClient, metricsClient metricsClient, sendInterval time.Duration) *UseCase {
+func NewUseCase(sendClient sendClient, metricsClient metricsClient,
+	sendInterval time.Duration, workerNums int64) *UseCase {
+	if workerNums == 0 {
+		workerNums = 1
+	}
+
 	return &UseCase{
 		sendClient:    sendClient,
 		metricsClient: metricsClient,
 		sendInterval:  sendInterval,
+		workerNums:    workerNums,
 	}
 }
 
 func (u *UseCase) SendMetrics(ctx context.Context) error {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
+	jobChan := make(chan []domain.MetricValue)
+	defer close(jobChan)
+
+	// воркеры отправители
+	for i := int64(0); i < u.workerNums; i++ {
+		go u.sendWorker(jobChan)
+	}
+
+	// воркер сборщик
 	go func() {
 		defer wg.Done()
-		u.sendMetrics(ctx)
+		u.sendMetrics(ctx, jobChan)
 	}()
 
 	wg.Wait()
@@ -49,7 +68,7 @@ func (u *UseCase) SendMetrics(ctx context.Context) error {
 	return nil
 }
 
-func (u *UseCase) sendMetrics(ctx context.Context) {
+func (u *UseCase) sendMetrics(ctx context.Context, job chan<- []domain.MetricValue) {
 	t := time.NewTicker(u.sendInterval)
 	defer t.Stop()
 
@@ -59,11 +78,29 @@ func (u *UseCase) sendMetrics(ctx context.Context) {
 			return
 		case <-t.C:
 			metrics := u.metricsClient.GetMetrics(ctx)
-			err := u.sendClient.SendMetrics(ctx, metrics)
-			if err != nil {
-				log.Printf("error send metric: %v", err)
+			part := int64(len(metrics)) / u.workerNums
+			for i := int64(0); i < u.workerNums; i += part {
+				bottom := i
+				top := i + part
+				if top > int64(len(metrics)) {
+					top = int64(len(metrics))
+				}
+
+				job <- metrics[bottom:top]
 			}
+
 		}
+	}
+}
+
+func (u *UseCase) sendWorker(job <-chan []domain.MetricValue) {
+	for metrics := range job {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err := u.sendClient.SendMetrics(ctx, metrics)
+		if err != nil {
+			log.Printf("error send metric: %v", err)
+		}
+		cancel()
 	}
 }
 
@@ -126,6 +163,23 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "RandomValue",
 		GaugeValue: m.randomValue.GetValue(),
+		Type:       domain.GaugeMetricType,
+	})
+	vm, _ := mem.VirtualMemory()
+	metrics = append(metrics, domain.MetricValue{
+		Name:       "TotalMemory",
+		GaugeValue: float64(vm.Total),
+		Type:       domain.GaugeMetricType,
+	})
+	metrics = append(metrics, domain.MetricValue{
+		Name:       "FreeMemory",
+		GaugeValue: float64(vm.Free),
+		Type:       domain.GaugeMetricType,
+	})
+	cc, _ := cpu.Counts(true)
+	metrics = append(metrics, domain.MetricValue{
+		Name:       "CPUutilization1",
+		GaugeValue: float64(cc),
 		Type:       domain.GaugeMetricType,
 	})
 	m.mu.RUnlock()
