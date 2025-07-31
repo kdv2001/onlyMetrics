@@ -68,7 +68,8 @@ func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
 			hh := hmac.New(sha256.New, []byte(key))
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "error read body", http.StatusInternalServerError)
+				logger.Errorf(r.Context(), "eroror read body: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 
@@ -76,13 +77,15 @@ func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 			if _, err = hh.Write(body); err != nil {
-				http.Error(w, "error get hash", http.StatusInternalServerError)
+				logger.Errorf(r.Context(), "eroror write body: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 
 			hashSumReq, err := hex.DecodeString(hashHeader)
 			if err != nil {
-				http.Error(w, "error get hash", http.StatusInternalServerError)
+				logger.Errorf(r.Context(), "eroror decode header: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 

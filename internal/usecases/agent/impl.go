@@ -23,7 +23,7 @@ type sendClient interface {
 }
 
 type metricsClient interface {
-	GetMetrics(ctx context.Context) []domain.MetricValue
+	GetMetrics(ctx context.Context) ([]domain.MetricValue, error)
 }
 type UseCase struct {
 	sendClient    sendClient
@@ -48,15 +48,14 @@ func NewUseCase(sendClient sendClient, metricsClient metricsClient,
 
 func (u *UseCase) SendMetrics(ctx context.Context) error {
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	jobChan := make(chan []domain.MetricValue)
-	defer close(jobChan)
-
+	jobChan := make(chan []domain.MetricValue, u.workerNums)
 	// воркеры отправители
 	for i := int64(0); i < u.workerNums; i++ {
-		go u.sendWorker(jobChan)
+		wg.Add(1)
+		go u.sendWorker(jobChan, &wg)
 	}
 
+	wg.Add(1)
 	// воркер сборщик
 	go func() {
 		defer wg.Done()
@@ -75,9 +74,14 @@ func (u *UseCase) sendMetrics(ctx context.Context, job chan<- []domain.MetricVal
 	for {
 		select {
 		case <-ctx.Done():
+			close(job)
 			return
 		case <-t.C:
-			metrics := u.metricsClient.GetMetrics(ctx)
+			metrics, err := u.metricsClient.GetMetrics(ctx)
+			if err != nil {
+				log.Printf("error GetMetrics: %v", err)
+				continue
+			}
 			part := int64(len(metrics)) / u.workerNums
 			for i := int64(0); i < u.workerNums; i += part {
 				bottom := i
@@ -93,7 +97,8 @@ func (u *UseCase) sendMetrics(ctx context.Context, job chan<- []domain.MetricVal
 	}
 }
 
-func (u *UseCase) sendWorker(job <-chan []domain.MetricValue) {
+func (u *UseCase) sendWorker(job <-chan []domain.MetricValue, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for metrics := range job {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		err := u.sendClient.SendMetrics(ctx, metrics)
@@ -151,8 +156,13 @@ func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
 	return m
 }
 
-func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
+func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, error) {
 	m.mu.RLock()
+	vm, err := mem.VirtualMemory()
+	if err != nil {
+		return nil, err
+	}
+
 	v := reflect.ValueOf(m.stats).Elem()
 	metrics := recursiveGetMetrics(v)
 	metrics = append(metrics, domain.MetricValue{
@@ -165,7 +175,6 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
 		GaugeValue: m.randomValue.GetValue(),
 		Type:       domain.GaugeMetricType,
 	})
-	vm, _ := mem.VirtualMemory()
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "TotalMemory",
 		GaugeValue: float64(vm.Total),
@@ -184,7 +193,7 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) []domain.MetricValue {
 	})
 	m.mu.RUnlock()
 
-	return metrics
+	return metrics, nil
 }
 
 func (m *MetricsUpdater) updateMetrics() {
