@@ -1,7 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"time"
@@ -10,6 +14,93 @@ import (
 
 	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 )
+
+type hashWriter struct {
+	key string
+	w   http.ResponseWriter
+}
+
+// NewHashWriter ...
+func NewHashWriter(w http.ResponseWriter, key string) *hashWriter {
+	return &hashWriter{
+		key: key,
+		w:   w,
+	}
+}
+
+// Header ...
+func (c *hashWriter) Header() http.Header {
+	return c.w.Header()
+}
+
+// Write ...
+func (c *hashWriter) Write(p []byte) (int, error) {
+	hh := hmac.New(sha256.New, []byte(c.key))
+	if _, err := hh.Write(p); err != nil {
+		return c.w.Write(p)
+	}
+
+	bufSHA := hh.Sum(nil)
+
+	str := hex.EncodeToString(bufSHA)
+	c.Header().Set(HashSHA256, str)
+
+	return c.w.Write(p)
+}
+
+// WriteHeader ...
+func (c *hashWriter) WriteHeader(statusCode int) {
+	c.w.WriteHeader(statusCode)
+}
+
+// NewSha256Middleware ...
+func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		f := func(w http.ResponseWriter, r *http.Request) {
+			hashHeader := r.Header.Get(HashSHA256)
+			if hashHeader == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			hW := NewHashWriter(w, key)
+
+			hh := hmac.New(sha256.New, []byte(key))
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				logger.Errorf(r.Context(), "eroror read body: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			defer r.Body.Close()
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+
+			if _, err = hh.Write(body); err != nil {
+				logger.Errorf(r.Context(), "eroror write body: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			hashSumReq, err := hex.DecodeString(hashHeader)
+			if err != nil {
+				logger.Errorf(r.Context(), "eroror decode header: %v", err)
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			hashSum := hh.Sum(nil)
+			if equal := hmac.Equal(hashSum, hashSumReq); !equal {
+				http.Error(w, "error compare request hash", http.StatusBadRequest)
+				return
+			}
+
+			next.ServeHTTP(hW, r)
+		}
+
+		return http.HandlerFunc(f)
+	}
+}
 
 // defaultAcceptedEncodingTypes поддерживаемы типы для компрессии
 var defaultAcceptedEncodingTypes = map[string]struct{}{
@@ -111,13 +202,6 @@ func CompressMiddleware(encodingTypes map[string]struct{}) func(handler http.Han
 	}
 }
 
-// compressReader реализует интерфейс io.ReadCloser и позволяет прозрачно для сервера
-// декомпрессировать получаемые от клиента данные
-type compressReader struct {
-	r  io.ReadCloser
-	zr *gzip.Reader
-}
-
 // DecompressMiddleware создаёт middleware для декомпрессии
 func DecompressMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -173,7 +257,7 @@ func RequestMiddleware() func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			defer func() {
-				logger.Infof(r.Context(), "request: url: %s; method: %s; processing time: %s; body: %s",
+				logger.Infof(r.Context(), "request: url: %s; method: %s; processing time: %s",
 					r.URL.String(), r.Method, time.Since(start).String())
 			}()
 
