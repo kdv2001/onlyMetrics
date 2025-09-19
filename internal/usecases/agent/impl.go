@@ -205,7 +205,7 @@ func (m *MetricsUpdater) updateMetrics() {
 }
 
 func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
-	res := make([]domain.MetricValue, 0, 1)
+	res := make([]domain.MetricValue, 0, v.NumField())
 	for i := 0; i < v.NumField(); i++ {
 		switch {
 		case v.Type().Field(i).Type.Kind() == reflect.Uint64:
