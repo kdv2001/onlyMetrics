@@ -3,6 +3,7 @@ package domain
 import "testing"
 
 func TestNewMetricTypeFromString(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		s string
 	}
@@ -12,10 +13,34 @@ func TestNewMetricTypeFromString(t *testing.T) {
 		want    MetricType
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "GaugeMetricType",
+			args: args{
+				s: GaugeMetricType.String(),
+			},
+			want:    GaugeMetricType,
+			wantErr: false,
+		},
+		{
+			name: "CounterMetricType",
+			args: args{
+				s: CounterMetricType.String(),
+			},
+			want:    CounterMetricType,
+			wantErr: false,
+		},
+		{
+			name: "UnknownMetricType",
+			args: args{
+				s: "Unknown",
+			},
+			want:    "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := NewMetricTypeFromString(tt.args.s)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewMetricTypeFromString() error = %v, wantErr %v", err, tt.wantErr)
