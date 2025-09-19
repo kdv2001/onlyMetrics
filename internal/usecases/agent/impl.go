@@ -14,6 +14,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
+	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 )
 
 type sendClient interface {
@@ -111,7 +112,7 @@ func (u *UseCase) sendWorker(job <-chan []domain.MetricValue, wg *sync.WaitGroup
 
 type MetricsUpdater struct {
 	mu          sync.RWMutex
-	stats       *runtime.MemStats
+	stats       []domain.MetricValue
 	pollCount   atomic.Int64
 	randomValue Container[float64]
 }
@@ -136,10 +137,10 @@ func (c *Container[T]) SetValue(n T) {
 	c.mu.Unlock()
 }
 
-func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
+func NewMetricsUpdater(ctx context.Context, metricInterval time.Duration) *MetricsUpdater {
 	m := &MetricsUpdater{
 		mu:          sync.RWMutex{},
-		stats:       &runtime.MemStats{},
+		stats:       nil,
 		pollCount:   atomic.Int64{},
 		randomValue: Container[float64]{},
 	}
@@ -148,8 +149,16 @@ func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
 		t := time.NewTicker(metricInterval)
 		defer t.Stop()
 
-		for range t.C {
-			m.updateMetrics()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				err := m.updateMetrics(ctx)
+				if err != nil {
+					logger.Errorf(ctx, "error updating metrics: %v", err)
+				}
+			}
 		}
 	}()
 
@@ -158,23 +167,23 @@ func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
 
 func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, error) {
 	m.mu.RLock()
+	metrics := m.stats
+	m.mu.RUnlock()
+
+	return metrics, nil
+}
+
+func (m *MetricsUpdater) updateMetrics(_ context.Context) error {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	v := reflect.ValueOf(m.stats).Elem()
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	v := reflect.ValueOf(stats).Elem()
 	metrics := recursiveGetMetrics(v)
-	metrics = append(metrics, domain.MetricValue{
-		Name:         "PollCount",
-		CounterValue: m.pollCount.Load(),
-		Type:         domain.CounterMetricType,
-	})
-	metrics = append(metrics, domain.MetricValue{
-		Name:       "RandomValue",
-		GaugeValue: m.randomValue.GetValue(),
-		Type:       domain.GaugeMetricType,
-	})
+
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "TotalMemory",
 		GaugeValue: float64(vm.Total),
@@ -185,23 +194,34 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, er
 		GaugeValue: float64(vm.Free),
 		Type:       domain.GaugeMetricType,
 	})
+
+	pollCountNew := m.pollCount.Add(1)
+	metrics = append(metrics, domain.MetricValue{
+		Name:         "PollCount",
+		CounterValue: pollCountNew,
+		Type:         domain.CounterMetricType,
+	})
+
+	randomValueNew := rand.Float64()
+	m.randomValue.SetValue(randomValueNew)
+	metrics = append(metrics, domain.MetricValue{
+		Name:       "RandomValue",
+		GaugeValue: randomValueNew,
+		Type:       domain.GaugeMetricType,
+	})
+
 	cc, _ := cpu.Counts(true)
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "CPUutilization1",
 		GaugeValue: float64(cc),
 		Type:       domain.GaugeMetricType,
 	})
-	m.mu.RUnlock()
 
-	return metrics, nil
-}
-
-func (m *MetricsUpdater) updateMetrics() {
 	m.mu.Lock()
-	runtime.ReadMemStats(m.stats)
-	m.pollCount.Add(1)
-	m.randomValue.SetValue(rand.Float64())
+	m.stats = metrics
 	m.mu.Unlock()
+
+	return nil
 }
 
 func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
