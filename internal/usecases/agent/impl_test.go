@@ -115,3 +115,25 @@ func TestMetricsUpdater_updateMetrics(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkRecursiveGetMetrics(b *testing.B) {
+	b.Run("recursiveGetMetrics", func(b *testing.B) {
+		_ = recursiveGetMetrics(reflect.ValueOf(struct {
+			metricUint64  uint64
+			metricUint32  uint32
+			metricFloat64 float64
+			metricStruct  struct {
+				metricUint64 uint64
+			}
+		}{
+			metricUint64:  1,
+			metricUint32:  2,
+			metricFloat64: 3,
+			metricStruct: struct {
+				metricUint64 uint64
+			}{
+				metricUint64: 4,
+			},
+		}))
+	})
+}
