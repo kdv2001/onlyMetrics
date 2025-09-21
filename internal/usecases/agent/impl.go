@@ -1,3 +1,4 @@
+// Package agent предоставляет методы бизнес-логики для сбора метрик и последующей их обработки.
 package agent
 
 import (
@@ -14,7 +15,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 type sendClient interface {
@@ -26,6 +27,8 @@ type sendClient interface {
 type metricsClient interface {
 	GetMetrics(ctx context.Context) ([]domain.MetricValue, error)
 }
+
+// UseCase объект, содержащий бизнес-логику обработки метрик.
 type UseCase struct {
 	sendClient    sendClient
 	metricsClient metricsClient
@@ -33,6 +36,7 @@ type UseCase struct {
 	workerNums    int64
 }
 
+// NewUseCase создает объект бизнес логики.
 func NewUseCase(sendClient sendClient, metricsClient metricsClient,
 	sendInterval time.Duration, workerNums int64) *UseCase {
 	if workerNums == 0 {
@@ -47,6 +51,7 @@ func NewUseCase(sendClient sendClient, metricsClient metricsClient,
 	}
 }
 
+// SendMetrics отправляет метрики потребителю.
 func (u *UseCase) SendMetrics(ctx context.Context) error {
 	wg := sync.WaitGroup{}
 	jobChan := make(chan []domain.MetricValue, u.workerNums)
@@ -117,32 +122,38 @@ type MetricsUpdater struct {
 	randomValue Container[float64]
 }
 
-// Container ...
+// Container объект для обеспечения безопасного доступ к данным.
 type Container[T comparable] struct {
 	value T
 	mu    sync.RWMutex
 }
 
-// GetValue возвращает значение контейнера
+// GetValue возвращает значение контейнера.
 func (c *Container[T]) GetValue() T {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.value
 }
 
-// SetValue устанавливает новое значение контейнера
+// SetValue устанавливает новое значение контейнера.
 func (c *Container[T]) SetValue(n T) {
 	c.mu.Lock()
 	c.value = n
 	c.mu.Unlock()
 }
 
+// NewMetricsUpdater создает объект автоматического сбора и обновления метрик.
 func NewMetricsUpdater(ctx context.Context, metricInterval time.Duration) *MetricsUpdater {
 	m := &MetricsUpdater{
 		mu:          sync.RWMutex{},
 		stats:       nil,
 		pollCount:   atomic.Int64{},
 		randomValue: Container[float64]{},
+	}
+
+	err := m.updateMetrics(ctx)
+	if err != nil {
+		logger.Errorf(ctx, "error updating metrics: %v", err)
 	}
 
 	go func() {
@@ -165,6 +176,7 @@ func NewMetricsUpdater(ctx context.Context, metricInterval time.Duration) *Metri
 	return m
 }
 
+// GetMetrics возвращает собранные значения метрик.
 func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, error) {
 	m.mu.RLock()
 	metrics := m.stats
@@ -173,6 +185,7 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, er
 	return metrics, nil
 }
 
+// updateMetrics обновляет значения метрик.
 func (m *MetricsUpdater) updateMetrics(_ context.Context) error {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
@@ -224,6 +237,7 @@ func (m *MetricsUpdater) updateMetrics(_ context.Context) error {
 	return nil
 }
 
+// recursiveGetMetrics рекурсивно проходит по каждому полю структуры.
 func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
 	res := make([]domain.MetricValue, 0, v.NumField())
 	for i := 0; i < v.NumField(); i++ {

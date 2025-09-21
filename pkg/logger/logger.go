@@ -1,3 +1,6 @@
+// Package logger предоставляет функции для работы с логером:
+// - логирование сообщений с различным уровнем;
+// - помещение и извлечение логгера из контекста.
 package logger
 
 import (
@@ -6,6 +9,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// loggerKey приватный тип, необходим для извлечения логгера
+// из контекста только в рамках этого пакета
 type loggerKey string
 
 const key loggerKey = "contextLogger"
@@ -15,13 +20,13 @@ func ToContext(ctx context.Context, sugarLogger *zap.SugaredLogger) context.Cont
 	return context.WithValue(ctx, key, sugarLogger)
 }
 
-// Infof ...
+// Infof логгирует сообщение с уровнем INFO
 func Infof(ctx context.Context, format string, args ...any) {
 	logger := FromContext(ctx)
 	logger.Infof(format, args...)
 }
 
-// Errorf ...
+// Errorf логгирует сообщение с уровнем ERROR
 func Errorf(ctx context.Context, format string, args ...any) {
 	logger := FromContext(ctx)
 	logger.Errorf(format, args...)

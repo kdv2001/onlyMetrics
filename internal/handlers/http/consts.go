@@ -1,5 +1,6 @@
 package http
 
+// Константы заголовков
 const (
 	ContentType     = "Content-Type"
 	ContentEncoding = "Content-Encoding"

@@ -1,3 +1,4 @@
+// Package metrics предоставляет методы бизнес-логики для обработки полученных метрик от агента.
 package metrics
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 )
 
+// MetricStorage хранилище метрик.
 type MetricStorage interface {
 	UpdateGauge(ctx context.Context, value domain.MetricValue) error
 	UpdateCounter(ctx context.Context, value domain.MetricValue) error
@@ -17,16 +19,20 @@ type MetricStorage interface {
 	Ping(ctx context.Context) error
 	UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error
 }
+
+// UseCases бизнес-логика для сбора и обработки метрик.
 type UseCases struct {
 	metricStorage MetricStorage
 }
 
+// NewUseCases создает объект бизнес-логики для сбора и обработки метрик.
 func NewUseCases(metricStorage MetricStorage) *UseCases {
 	return &UseCases{
 		metricStorage: metricStorage,
 	}
 }
 
+// UpdateMetric обновляет метрику.
 func (uc *UseCases) UpdateMetric(ctx context.Context, value domain.MetricValue) error {
 	switch value.Type {
 	case domain.GaugeMetricType:
@@ -44,10 +50,12 @@ func (uc *UseCases) UpdateMetric(ctx context.Context, value domain.MetricValue) 
 	return nil
 }
 
+// GetAllMetrics возвращает значения всех метрик.
 func (uc *UseCases) GetAllMetrics(ctx context.Context) ([]domain.MetricValue, error) {
 	return uc.metricStorage.GetAllValues(ctx)
 }
 
+// GetMetric возвращает значение одной метрики.
 func (uc *UseCases) GetMetric(ctx context.Context, value domain.MetricType,
 	name string) (domain.MetricValue, error) {
 	switch value {
@@ -77,11 +85,12 @@ func (uc *UseCases) GetMetric(ctx context.Context, value domain.MetricType,
 	return domain.MetricValue{}, errors.New("unknown metric type")
 }
 
-// Ping ...
+// Ping возвращает признак работоспособности приложения.
 func (uc *UseCases) Ping(ctx context.Context) error {
 	return uc.metricStorage.Ping(ctx)
 }
 
+// UpdateMetrics обновляет значения метрик.
 func (uc *UseCases) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
 	return uc.metricStorage.UpdateMetrics(ctx, metrics)
 }

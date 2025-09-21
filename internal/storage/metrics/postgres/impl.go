@@ -1,3 +1,4 @@
+// Package postgres предоставляет методы для работы с postgres хранилищем метрик.
 package postgres
 
 import (
@@ -11,15 +12,15 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
-// Storage ...
+// Storage хранилище метрик.
 type Storage struct {
 	dbConn *pgx.Conn
 }
 
-// NewStorage ...
+// NewStorage создает объект хранилища.
 func NewStorage(ctx context.Context, conn *pgx.Conn) (*Storage, error) {
 	s := &Storage{
 		dbConn: conn,
@@ -46,6 +47,7 @@ func (s *Storage) createTables(ctx context.Context) error {
 	return tx.Commit(ctx)
 }
 
+// Close безопасно закрывает хранилище.
 func (s *Storage) Close(ctx context.Context) {
 	err := s.dbConn.Close(ctx)
 	if err != nil {
@@ -53,12 +55,12 @@ func (s *Storage) Close(ctx context.Context) {
 	}
 }
 
-// Ping ...
+// Ping проверяет работоспособность хранилища.
 func (s *Storage) Ping(ctx context.Context) error {
 	return s.dbConn.Ping(ctx)
 }
 
-// UpdateGauge ...
+// UpdateGauge обновляет метрику типа "Градусник".
 func (s *Storage) UpdateGauge(ctx context.Context, value domain.MetricValue) error {
 	_, err := s.dbConn.Exec(ctx, `insert into values (metric_name, gauge_value, agent_name, created_at)
 values ($1,   $2, $3, $4);`,
@@ -74,7 +76,7 @@ values ($1,   $2, $3, $4);`,
 	return nil
 }
 
-// UpdateCounter ...
+// UpdateCounter обновляет метрику типа "Счетчик".
 func (s *Storage) UpdateCounter(ctx context.Context, value domain.MetricValue) error {
 	_, err := s.dbConn.Exec(ctx, `insert into values (metric_name, counter_value, agent_name, created_at) 
 values ($1,   $2, $3, $4);`,
@@ -90,7 +92,7 @@ values ($1,   $2, $3, $4);`,
 	return nil
 }
 
-// metricValue postgres представление
+// metricValue postgres представление метрики.
 type metricValue struct {
 	ID           sql.NullInt64   `db:"id"`
 	MetricName   sql.NullString  `db:"metric_name"`
@@ -100,7 +102,7 @@ type metricValue struct {
 	CreatedAt    sql.NullTime    `db:"created_at"`
 }
 
-// GetGaugeValue ...
+// GetGaugeValue возвращает значение метрики типа "Градусник".
 func (s *Storage) GetGaugeValue(ctx context.Context, name string) (float64, error) {
 	res := new(metricValue)
 	err := s.dbConn.QueryRow(ctx,
@@ -120,6 +122,8 @@ func (s *Storage) GetGaugeValue(ctx context.Context, name string) (float64, erro
 
 	return res.GaugeValue.Float64, nil
 }
+
+// GetCounterValue возвращает значение метрики типа "Счетчик".
 func (s *Storage) GetCounterValue(ctx context.Context, name string) (int64, error) {
 	res := sql.NullInt64{}
 	err := s.dbConn.QueryRow(ctx,
@@ -140,7 +144,7 @@ func (s *Storage) GetCounterValue(ctx context.Context, name string) (int64, erro
 	return res.Int64, nil
 }
 
-// GetAllValues ...
+// GetAllValues возвращает все метрики из хранилища.
 func (s *Storage) GetAllValues(ctx context.Context) ([]domain.MetricValue, error) {
 	rowsGauge, err := s.dbConn.Query(ctx, `
 select metric_name, gauge_value
@@ -214,7 +218,7 @@ group by metric_name;
 	return res, nil
 }
 
-// UpdateMetrics ...
+// UpdateMetrics обновляет значения переданных метрик.
 func (s *Storage) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
 	for _, metric := range metrics {
 		switch metric.Type {

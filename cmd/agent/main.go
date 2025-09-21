@@ -9,8 +9,8 @@ import (
 	"go.uber.org/zap"
 
 	metricsHTTP "github.com/kdv2001/onlyMetrics/internal/clients/metrics/http"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/agent"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 func main() {

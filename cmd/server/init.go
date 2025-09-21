@@ -10,10 +10,10 @@ import (
 	"go.uber.org/zap"
 
 	sericeHttp "github.com/kdv2001/onlyMetrics/internal/handlers/http"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/memory"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/postgres"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/metrics"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 func initService() error {

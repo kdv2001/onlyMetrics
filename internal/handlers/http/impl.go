@@ -1,3 +1,4 @@
+// Package http предоставляет http обработчики для сбора метрик и их последующего предоставления клиенту.
 package http
 
 import (
@@ -13,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 type useCases interface {
@@ -25,10 +26,12 @@ type useCases interface {
 	UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error
 }
 
+// Handlers http обработчики для сбора метрик и их последующего предоставления клиенту.
 type Handlers struct {
 	metricUseCases useCases
 }
 
+// NewHandlers создает объект http обработчиков для сбора метрик и их последующего предоставления клиенту.
 func NewHandlers(useCases useCases) *Handlers {
 	return &Handlers{
 		metricUseCases: useCases,
@@ -41,7 +44,7 @@ const (
 	ValuePathKey      = "value"
 )
 
-// CollectMetric обработчик сбора метрик из URL параметров
+// CollectMetric обработчик сбора метрик из URL параметров.
 func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 	t, err := domain.NewMetricTypeFromString(chi.URLParam(r, MetricTypePathKey))
 	if err != nil {
@@ -97,7 +100,7 @@ type metric struct {
 	Value *float64 `json:"value,omitempty"` // Значение метрики в случае передачи gauge
 }
 
-// CollectBodyMetric обработчик сбора метрик из тела запроса
+// CollectBodyMetric обработчик сбора метрик из тела запроса.
 func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -133,7 +136,7 @@ func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetMetric обработчик для получения метрик
+// GetMetric обработчик для получения метрики.
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	t, err := domain.NewMetricTypeFromString(chi.URLParam(r, MetricTypePathKey))
 	if err != nil {
@@ -165,6 +168,7 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAllMetric обработчик для получения всех метрик.
 func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	values, err := h.metricUseCases.GetAllMetrics(r.Context())
 	if err != nil {
@@ -206,7 +210,7 @@ func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetBodyMetric обработчик для получения метрик в теле запроса
+// GetBodyMetric обработчик для получения метрик в теле запроса.
 func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -272,6 +276,7 @@ func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetPing обработчик для проверки работоспособности сервиса.
 func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
 	err := h.metricUseCases.Ping(r.Context())
 	if err != nil {
@@ -282,6 +287,7 @@ func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// UpdateMetrics обработчик для обновления метрик.
 func (h *Handlers) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
