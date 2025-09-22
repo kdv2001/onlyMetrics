@@ -1,0 +1,254 @@
+basePath: /
+definitions:
+  http.metric:
+    properties:
+      delta:
+        description: Значение метрики в случае передачи counter
+        type: integer
+      id:
+        description: Имя метрики
+        type: string
+      type:
+        description: параметр, принимающий значение gauge или counter
+        type: string
+      value:
+        description: Значение метрики в случае передачи gauge
+        type: number
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@onlyMetrics.io
+  description: Сервис для сбора значений метрик с агентов.
+  title: onlyMetric API
+  version: "1.0"
+paths:
+  /:
+    get:
+      consumes:
+      - text/plain
+      description: get all metric
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "423":
+          description: Locked
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: get  all metric
+      tags:
+      - metric
+  /ping:
+    get:
+      description: get ping
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: get ping
+      tags:
+      - ping
+  /update:
+    post:
+      consumes:
+      - application/json
+      description: collect metric from body
+      parameters:
+      - description: metric
+        in: body
+        name: metric
+        required: true
+        schema:
+          $ref: '#/definitions/http.metric'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "423":
+          description: Locked
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: collect metric
+      tags:
+      - metric
+  /update/{metricType}/{metricName}/{value}:
+    post:
+      consumes:
+      - application/json
+      description: collect metric from query
+      parameters:
+      - description: metricType
+        in: query
+        name: metricType
+        required: true
+        type: string
+      - description: value
+        format: float64
+        in: query
+        name: value
+        required: true
+        type: number
+      - description: metricName
+        in: query
+        name: metricName
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: collect metric
+      tags:
+      - metric
+  /updates:
+    post:
+      consumes:
+      - application/json
+      description: update metrics
+      parameters:
+      - description: metric
+        in: body
+        name: metric
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/http.metric'
+          type: array
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "423":
+          description: Locked
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: update metrics
+      tags:
+      - metric
+  /value:
+    post:
+      consumes:
+      - application/json
+      description: get body metrics
+      parameters:
+      - description: metric
+        in: body
+        name: metric
+        required: true
+        schema:
+          $ref: '#/definitions/http.metric'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.metric'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "423":
+          description: Locked
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: get body metrics
+      tags:
+      - metric
+  /value/{metricType}/{metricName}:
+    get:
+      consumes:
+      - application/json
+      description: get metric
+      parameters:
+      - description: metricType
+        in: query
+        name: metricType
+        required: true
+        type: string
+      - description: metricName
+        in: query
+        name: metricName
+        required: true
+        type: string
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "423":
+          description: Locked
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: get metric
+      tags:
+      - metric
+swagger: "2.0"
