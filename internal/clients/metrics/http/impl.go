@@ -1,3 +1,4 @@
+// Package http предоставляет методы для отправки метрик на сервер по http.
 package http
 
 import (
@@ -22,11 +23,13 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Client клиент для отправки метрик.
 type Client struct {
 	client    httpClient
 	serverURL url.URL
 }
 
+// NewClient создает клиент для отправки метрик.
 func NewClient(client httpClient, serverURL url.URL) *Client {
 	return &Client{
 		client:    client,
@@ -34,10 +37,12 @@ func NewClient(client httpClient, serverURL url.URL) *Client {
 	}
 }
 
+// SendGauge отправляет метрику типа "Градусник".
 func (c *Client) SendGauge(ctx context.Context, value domain.MetricValue) error {
 	return c.send(ctx, value)
 }
 
+// SendCounter отправляет метрику типа "Счетчик".
 func (c *Client) SendCounter(ctx context.Context, value domain.MetricValue) error {
 	return c.send(ctx, value)
 }
@@ -82,17 +87,17 @@ type BodyClient struct {
 	hh       func([]byte) ([]byte, error)
 }
 
-// clientOption опция клиента
+// clientOption опция клиента.
 type clientOption func(c *BodyClient)
 
-// CompresGZIPOpt включает gzip сжатие
+// CompresGZIPOpt включает gzip сжатие.
 func CompresGZIPOpt() clientOption {
 	return func(c *BodyClient) {
 		c.withGzip = true
 	}
 }
 
-// WithSHA256Opt включает добавление подписи sha@56
+// WithSHA256Opt включает добавление подписи sha256.
 func WithSHA256Opt(key string) clientOption {
 	if key == "" {
 		return func(c *BodyClient) {
@@ -112,7 +117,7 @@ func WithSHA256Opt(key string) clientOption {
 	}
 }
 
-// NewBodyClient ...
+// NewBodyClient создает клиент для отправки метрик на сервер в теле запроса в формате JSON.
 func NewBodyClient(client httpClient, serverURL url.URL, opts ...clientOption) *BodyClient {
 	bc := &BodyClient{
 		client:    client,
@@ -126,12 +131,12 @@ func NewBodyClient(client httpClient, serverURL url.URL, opts ...clientOption) *
 	return bc
 }
 
-// SendGauge ...
+// SendGauge отправляет метрику типа "Градусник".
 func (c *BodyClient) SendGauge(ctx context.Context, value domain.MetricValue) error {
 	return c.send(ctx, value)
 }
 
-// SendCounter ...
+// SendCounter отправляет метрику типа "Счетчик".
 func (c *BodyClient) SendCounter(ctx context.Context, value domain.MetricValue) error {
 	return c.send(ctx, value)
 }
@@ -203,6 +208,7 @@ func (c *BodyClient) send(ctx context.Context, value domain.MetricValue) error {
 	return nil
 }
 
+// SendMetrics отправляет набор метрик.
 func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricValue) error {
 	sendMetricURL := c.serverURL.JoinPath("updates")
 	type metric struct {

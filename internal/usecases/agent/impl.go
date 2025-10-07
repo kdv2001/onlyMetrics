@@ -1,3 +1,4 @@
+// Package agent предоставляет методы бизнес-логики для сбора метрик и последующей их обработки.
 package agent
 
 import (
@@ -14,6 +15,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 type sendClient interface {
@@ -25,6 +27,8 @@ type sendClient interface {
 type metricsClient interface {
 	GetMetrics(ctx context.Context) ([]domain.MetricValue, error)
 }
+
+// UseCase объект, содержащий бизнес-логику обработки метрик.
 type UseCase struct {
 	sendClient    sendClient
 	metricsClient metricsClient
@@ -32,6 +36,7 @@ type UseCase struct {
 	workerNums    int64
 }
 
+// NewUseCase создает объект бизнес логики.
 func NewUseCase(sendClient sendClient, metricsClient metricsClient,
 	sendInterval time.Duration, workerNums int64) *UseCase {
 	if workerNums == 0 {
@@ -46,6 +51,7 @@ func NewUseCase(sendClient sendClient, metricsClient metricsClient,
 	}
 }
 
+// SendMetrics отправляет метрики потребителю.
 func (u *UseCase) SendMetrics(ctx context.Context) error {
 	wg := sync.WaitGroup{}
 	jobChan := make(chan []domain.MetricValue, u.workerNums)
@@ -111,70 +117,86 @@ func (u *UseCase) sendWorker(job <-chan []domain.MetricValue, wg *sync.WaitGroup
 
 type MetricsUpdater struct {
 	mu          sync.RWMutex
-	stats       *runtime.MemStats
+	stats       []domain.MetricValue
 	pollCount   atomic.Int64
 	randomValue Container[float64]
 }
 
-// Container ...
+// Container объект для обеспечения безопасного доступ к данным.
 type Container[T comparable] struct {
 	value T
 	mu    sync.RWMutex
 }
 
-// GetValue возвращает значение контейнера
+// GetValue возвращает значение контейнера.
 func (c *Container[T]) GetValue() T {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.value
 }
 
-// SetValue устанавливает новое значение контейнера
+// SetValue устанавливает новое значение контейнера.
 func (c *Container[T]) SetValue(n T) {
 	c.mu.Lock()
 	c.value = n
 	c.mu.Unlock()
 }
 
-func NewMetricsUpdater(metricInterval time.Duration) *MetricsUpdater {
+// NewMetricsUpdater создает объект автоматического сбора и обновления метрик.
+func NewMetricsUpdater(ctx context.Context, metricInterval time.Duration) *MetricsUpdater {
 	m := &MetricsUpdater{
 		mu:          sync.RWMutex{},
-		stats:       &runtime.MemStats{},
+		stats:       nil,
 		pollCount:   atomic.Int64{},
 		randomValue: Container[float64]{},
+	}
+
+	err := m.updateMetrics(ctx)
+	if err != nil {
+		logger.Errorf(ctx, "error updating metrics: %v", err)
 	}
 
 	go func() {
 		t := time.NewTicker(metricInterval)
 		defer t.Stop()
 
-		for range t.C {
-			m.updateMetrics()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				err := m.updateMetrics(ctx)
+				if err != nil {
+					logger.Errorf(ctx, "error updating metrics: %v", err)
+				}
+			}
 		}
 	}()
 
 	return m
 }
 
+// GetMetrics возвращает собранные значения метрик.
 func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, error) {
 	m.mu.RLock()
+	metrics := m.stats
+	m.mu.RUnlock()
+
+	return metrics, nil
+}
+
+// updateMetrics обновляет значения метрик.
+func (m *MetricsUpdater) updateMetrics(_ context.Context) error {
 	vm, err := mem.VirtualMemory()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	v := reflect.ValueOf(m.stats).Elem()
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	v := reflect.ValueOf(stats).Elem()
 	metrics := recursiveGetMetrics(v)
-	metrics = append(metrics, domain.MetricValue{
-		Name:         "PollCount",
-		CounterValue: m.pollCount.Load(),
-		Type:         domain.CounterMetricType,
-	})
-	metrics = append(metrics, domain.MetricValue{
-		Name:       "RandomValue",
-		GaugeValue: m.randomValue.GetValue(),
-		Type:       domain.GaugeMetricType,
-	})
+
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "TotalMemory",
 		GaugeValue: float64(vm.Total),
@@ -185,27 +207,39 @@ func (m *MetricsUpdater) GetMetrics(_ context.Context) ([]domain.MetricValue, er
 		GaugeValue: float64(vm.Free),
 		Type:       domain.GaugeMetricType,
 	})
+
+	pollCountNew := m.pollCount.Add(1)
+	metrics = append(metrics, domain.MetricValue{
+		Name:         "PollCount",
+		CounterValue: pollCountNew,
+		Type:         domain.CounterMetricType,
+	})
+
+	randomValueNew := rand.Float64()
+	m.randomValue.SetValue(randomValueNew)
+	metrics = append(metrics, domain.MetricValue{
+		Name:       "RandomValue",
+		GaugeValue: randomValueNew,
+		Type:       domain.GaugeMetricType,
+	})
+
 	cc, _ := cpu.Counts(true)
 	metrics = append(metrics, domain.MetricValue{
 		Name:       "CPUutilization1",
 		GaugeValue: float64(cc),
 		Type:       domain.GaugeMetricType,
 	})
-	m.mu.RUnlock()
 
-	return metrics, nil
-}
-
-func (m *MetricsUpdater) updateMetrics() {
 	m.mu.Lock()
-	runtime.ReadMemStats(m.stats)
-	m.pollCount.Add(1)
-	m.randomValue.SetValue(rand.Float64())
+	m.stats = metrics
 	m.mu.Unlock()
+
+	return nil
 }
 
+// recursiveGetMetrics рекурсивно проходит по каждому полю структуры.
 func recursiveGetMetrics(v reflect.Value) []domain.MetricValue {
-	res := make([]domain.MetricValue, 0, 1)
+	res := make([]domain.MetricValue, 0, v.NumField())
 	for i := 0; i < v.NumField(); i++ {
 		switch {
 		case v.Type().Field(i).Type.Kind() == reflect.Uint64:

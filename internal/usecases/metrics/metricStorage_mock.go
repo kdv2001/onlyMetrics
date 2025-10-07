@@ -7,7 +7,9 @@ import (
 )
 
 type mockMetric struct {
-	err error
+	gaugeValue   float64
+	counterValue int64
+	err          error
 }
 
 func (m *mockMetric) UpdateGauge(_ context.Context, value domain.MetricValue) error {
@@ -19,11 +21,11 @@ func (m *mockMetric) UpdateCounter(_ context.Context, value domain.MetricValue) 
 }
 
 func (m *mockMetric) GetGaugeValue(_ context.Context, name string) (float64, error) {
-	return 0, m.err
+	return m.gaugeValue, m.err
 }
 
 func (m *mockMetric) GetCounterValue(_ context.Context, name string) (int64, error) {
-	return 0, m.err
+	return m.counterValue, m.err
 }
 
 func (m *mockMetric) GetAllValues(_ context.Context) ([]domain.MetricValue, error) {

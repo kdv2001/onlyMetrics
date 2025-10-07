@@ -1,3 +1,4 @@
+// Package http предоставляет http обработчики для сбора метрик и их последующего предоставления клиенту.
 package http
 
 import (
@@ -13,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 type useCases interface {
@@ -25,10 +26,21 @@ type useCases interface {
 	UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error
 }
 
+//	@Title			onlyMetric API
+//	@Description	Сервис для сбора значений метрик с агентов.
+//	@Version		1.0
+
+//	@Contact.email	support@onlyMetrics.io
+
+//	@BasePath	/
+//	@Host		localhost:8080
+
+// Handlers http обработчики для сбора метрик и их последующего предоставления клиенту.
 type Handlers struct {
 	metricUseCases useCases
 }
 
+// NewHandlers создает объект http обработчиков для сбора метрик и их последующего предоставления клиенту.
 func NewHandlers(useCases useCases) *Handlers {
 	return &Handlers{
 		metricUseCases: useCases,
@@ -41,7 +53,21 @@ const (
 	ValuePathKey      = "value"
 )
 
-// CollectMetric обработчик сбора метрик из URL параметров
+// CollectMetric обработчик сбора метрик из URL параметров.
+//
+//	@Summary		collect metric
+//	@Description	collect metric from query
+//	@Tags			metric
+//	@Accept			json
+//	@Produce		plain
+//	@Param			metricType	query		string	true	"metricType"
+//	@Param			value		query		float64	true	"value"
+//	@Param			metricName	query		string	true	"metricName"
+//	@Success		200			{object}	string
+//	@Failure		400			{object}	string
+//	@Failure		404			{object}	string
+//	@Failure		500			{object}	string
+//	@Router			/update/{metricType}/{metricName}/{value} [post]
 func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 	t, err := domain.NewMetricTypeFromString(chi.URLParam(r, MetricTypePathKey))
 	if err != nil {
@@ -97,7 +123,19 @@ type metric struct {
 	Value *float64 `json:"value,omitempty"` // Значение метрики в случае передачи gauge
 }
 
-// CollectBodyMetric обработчик сбора метрик из тела запроса
+// CollectBodyMetric обработчик сбора метрик из тела запроса.
+//
+//	@Summary		collect metric
+//	@Description	collect metric from body
+//	@Tags			metric
+//	@Accept			json
+//	@Produce		plain
+//	@Param			metric	body		http.metric	true	"metric"
+//	@Success		200		{object}	string
+//	@Failure		400		{object}	string
+//	@Failure		423		{object}	string
+//	@Failure		500		{object}	string
+//	@Router			/update [post]
 func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -133,7 +171,20 @@ func (h *Handlers) CollectBodyMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetMetric обработчик для получения метрик
+// GetMetric обработчик для получения метрики.
+//
+//	@Summary		get metric
+//	@Description	get metric
+//	@Tags			metric
+//	@Accept			json
+//	@Produce		plain
+//	@Param			metricType	query		string	true	"metricType"
+//	@Param			metricName	query		string	true	"metricName"
+//	@Success		200			{object}	string
+//	@Failure		400			{object}	string
+//	@Failure		423			{object}	string
+//	@Failure		500			{object}	string
+//	@Router			/value/{metricType}/{metricName}  [get]
 func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	t, err := domain.NewMetricTypeFromString(chi.URLParam(r, MetricTypePathKey))
 	if err != nil {
@@ -165,6 +216,18 @@ func (h *Handlers) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetAllMetric обработчик для получения всех метрик.
+//
+//	@Summary		get  all metric
+//	@Description	get all metric
+//	@Tags			metric
+//	@Accept			plain
+//	@Produce		plain
+//	@Success		200	{string}	string
+//	@Failure		400	{object}	string
+//	@Failure		423	{object}	string
+//	@Failure		500	{object}	string
+//	@Router			/  [get]
 func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	values, err := h.metricUseCases.GetAllMetrics(r.Context())
 	if err != nil {
@@ -206,7 +269,19 @@ func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// GetBodyMetric обработчик для получения метрик в теле запроса
+// GetBodyMetric обработчик для получения метрик в теле ответа.
+//
+//	@Summary		get body metrics
+//	@Description	get body metrics
+//	@Tags			metric
+//	@Accept			json
+//	@Produce		json
+//	@Param			metric	body		http.metric	true	"metric"
+//	@Success		200		{object}	http.metric
+//	@Failure		400		{object}	string
+//	@Failure		423		{object}	string
+//	@Failure		500		{object}	string
+//	@Router			/value  [post]
 func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -272,6 +347,14 @@ func (h *Handlers) GetBodyMetric(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetPing обработчик для проверки работоспособности сервиса.
+//
+//	@Summary		get ping
+//	@Description	get ping
+//	@Tags			ping
+//	@Success		200	{object}	string
+//	@Failure		500	{object}	string
+//	@Router			/ping  [get]
 func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
 	err := h.metricUseCases.Ping(r.Context())
 	if err != nil {
@@ -282,6 +365,19 @@ func (h *Handlers) GetPing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// UpdateMetrics обработчик для обновления метрик.
+//
+//	@Summary		update metrics
+//	@Description	update metrics
+//	@Tags			metric
+//	@Accept			json
+//	@Produce		plain
+//	@Param			metric	body		[]http.metric	true	"metric"
+//	@Success		200		{object}	string
+//	@Failure		400		{object}	string
+//	@Failure		423		{object}	string
+//	@Failure		500		{object}	string
+//	@Router			/updates [post]
 func (h *Handlers) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {

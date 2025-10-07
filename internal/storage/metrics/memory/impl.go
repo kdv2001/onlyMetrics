@@ -1,3 +1,4 @@
+// Package memory предоставляет методы для работы с in memory хранилищем метрик.
 package memory
 
 import (
@@ -11,10 +12,10 @@ import (
 	"time"
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
-// Storage хранилище метрик
+// Storage хранилище метрик.
 type Storage struct {
 	gaugeMu sync.RWMutex
 	gauge   map[string]float64
@@ -26,7 +27,7 @@ type Storage struct {
 	period   time.Duration
 }
 
-// NewStorage ...
+// NewStorage создает объект хранилища.
 func NewStorage(ctx context.Context, filePath string,
 	period time.Duration, restoreData bool) *Storage {
 	s := &Storage{
@@ -49,6 +50,7 @@ func NewStorage(ctx context.Context, filePath string,
 	return s
 }
 
+// Close закрывает хранилище с сохранением метрик.
 func (s *Storage) Close(ctx context.Context) {
 	err := s.flushMetrics(ctx)
 	if err != nil {
@@ -152,7 +154,7 @@ func (s *Storage) restoreMetrics(ctx context.Context) error {
 	return nil
 }
 
-// UpdateGauge обновить или добавить, если не существует, метрику типа "градусник"
+// UpdateGauge обновить или добавить, если не существует, метрику типа "градусник".
 func (s *Storage) UpdateGauge(ctx context.Context, value domain.MetricValue) error {
 	s.gaugeMu.Lock()
 	s.gauge[value.Name] = value.GaugeValue
@@ -165,7 +167,7 @@ func (s *Storage) UpdateGauge(ctx context.Context, value domain.MetricValue) err
 	return nil
 }
 
-// UpdateCounter обновить или добавить, если не существует, метрику типа "счетчик"
+// UpdateCounter обновить или добавить, если не существует, метрику типа "счетчик".
 func (s *Storage) UpdateCounter(ctx context.Context, value domain.MetricValue) error {
 	s.counterMu.Lock()
 	v := s.counter[value.Name]
@@ -179,7 +181,7 @@ func (s *Storage) UpdateCounter(ctx context.Context, value domain.MetricValue) e
 	return nil
 }
 
-// GetGaugeValue получить метрику типа "градусник"
+// GetGaugeValue получить метрику типа "градусник".
 func (s *Storage) GetGaugeValue(_ context.Context, name string) (float64, error) {
 	s.gaugeMu.RLock()
 	defer s.gaugeMu.RUnlock()
@@ -191,7 +193,7 @@ func (s *Storage) GetGaugeValue(_ context.Context, name string) (float64, error)
 	return val, nil
 }
 
-// GetCounterValue получить метрику типа "счетчик"
+// GetCounterValue получить метрику типа "счетчик".
 func (s *Storage) GetCounterValue(_ context.Context, name string) (int64, error) {
 	s.counterMu.RLock()
 	defer s.counterMu.RUnlock()
@@ -203,7 +205,7 @@ func (s *Storage) GetCounterValue(_ context.Context, name string) (int64, error)
 	return val, nil
 }
 
-// GetAllValues вернуть все значения метрик
+// GetAllValues вернуть все значения метрик.
 func (s *Storage) GetAllValues(_ context.Context) ([]domain.MetricValue, error) {
 	values := make([]domain.MetricValue, 0, len(s.gauge)+len(s.counter))
 	s.gaugeMu.RLock()
@@ -229,12 +231,12 @@ func (s *Storage) GetAllValues(_ context.Context) ([]domain.MetricValue, error) 
 	return values, nil
 }
 
-// Ping ...
+// Ping необходим только для удовлетворения общему интерфейсу.
 func (s *Storage) Ping(_ context.Context) error {
 	return nil
 }
 
-// UpdateMetrics ...
+// UpdateMetrics обновляет значения метрик.
 func (s *Storage) UpdateMetrics(ctx context.Context, metrics []domain.MetricValue) error {
 	errs := make([]error, 0)
 	for _, m := range metrics {

@@ -12,9 +12,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
+// hashWriter реализация интерфейса writer для перехвата информации ответа, последующего вычисления хэша
+// и добавления вычисленного значения в заголовки.
 type hashWriter struct {
 	key string
 	w   http.ResponseWriter
@@ -53,7 +55,7 @@ func (c *hashWriter) WriteHeader(statusCode int) {
 	c.w.WriteHeader(statusCode)
 }
 
-// NewSha256Middleware ...
+// NewSha256Middleware создаёт middleware для добавления хэш суммы.
 func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		f := func(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +116,7 @@ func GetDefaultAcceptedEncodingData() map[string]struct{} {
 }
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера
-// сжимать передаваемые данные и выставлять правильные HTTP-заголовки
+// сжимать передаваемые данные и выставлять правильные HTTP-заголовки.
 type compressWriter struct {
 	w              http.ResponseWriter
 	compressWriter io.WriteCloser
@@ -188,7 +190,7 @@ func (c *compressWriter) Close() error {
 	return c.compressWriter.Close()
 }
 
-// CompressMiddleware создаёт middleware для сжатия данных
+// CompressMiddleware создаёт middleware для сжатия данных.
 // TODO можно переделать на опции
 func CompressMiddleware(encodingTypes map[string]struct{}) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -202,7 +204,7 @@ func CompressMiddleware(encodingTypes map[string]struct{}) func(handler http.Han
 	}
 }
 
-// DecompressMiddleware создаёт middleware для декомпрессии
+// DecompressMiddleware создаёт middleware для декомпрессии.
 func DecompressMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +237,7 @@ func DecompressMiddleware() func(handler http.Handler) http.Handler {
 	}
 }
 
-// AddLoggerToContextMiddleware помещает logger в context
+// AddLoggerToContextMiddleware middleware для помещения logger в context.
 func AddLoggerToContextMiddleware(sugarLogger *zap.SugaredLogger) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -251,7 +253,7 @@ func AddLoggerToContextMiddleware(sugarLogger *zap.SugaredLogger) func(handler h
 	}
 }
 
-// RequestMiddleware middleware для логирования запросов
+// RequestMiddleware middleware для логирования запросов.
 func RequestMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -267,7 +269,7 @@ func RequestMiddleware() func(next http.Handler) http.Handler {
 	}
 }
 
-// ResponseMiddleware middleware для логирования ответов
+// ResponseMiddleware middleware для логирования ответов.
 func ResponseMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +289,7 @@ func ResponseMiddleware() func(handler http.Handler) http.Handler {
 	}
 }
 
-// WriterWithLogging реализация интерфейса writer для перехвата информации ответа
+// WriterWithLogging реализация интерфейса writer для перехвата информации ответа и последующего его логгирования.
 type WriterWithLogging struct {
 	statusCode   int
 	responseSize int
@@ -295,7 +297,7 @@ type WriterWithLogging struct {
 	baseWriter http.ResponseWriter
 }
 
-// NewWriterWithLogging создание нового WriterWithLogging объекта
+// NewWriterWithLogging создание нового WriterWithLogging объекта.
 func NewWriterWithLogging(baseWriter http.ResponseWriter) *WriterWithLogging {
 	return &WriterWithLogging{
 		baseWriter: baseWriter,

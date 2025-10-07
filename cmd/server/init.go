@@ -7,13 +7,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
 
+	_ "github.com/kdv2001/onlyMetrics/docs"
 	sericeHttp "github.com/kdv2001/onlyMetrics/internal/handlers/http"
-	"github.com/kdv2001/onlyMetrics/internal/pkg/logger"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/memory"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/postgres"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/metrics"
+	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
 func initService() error {
@@ -98,6 +100,8 @@ func initService() error {
 			r.Get("/", httpHandlers.GetMetric)
 		})
 	})
+
+	chiMux.Get("/swagger/*", httpSwagger.Handler())
 
 	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.serverAddr)
 
