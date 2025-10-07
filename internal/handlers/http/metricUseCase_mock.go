@@ -7,8 +7,8 @@ import (
 )
 
 type metricUseCaseMock struct {
-	value domain.MetricValue
 	err   error
+	value domain.MetricValue
 }
 
 func (m *metricUseCaseMock) UpdateMetric(ctx context.Context, value domain.MetricValue) error {

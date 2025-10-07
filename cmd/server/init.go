@@ -27,9 +27,9 @@ func initService() error {
 
 	var metricsStorage metrics.MetricStorage
 	if parsedFlags.postgresDSN != "" {
-		conn, err := pgx.Connect(ctx, parsedFlags.postgresDSN)
-		if err != nil {
-			return err
+		conn, iErr := pgx.Connect(ctx, parsedFlags.postgresDSN)
+		if iErr != nil {
+			return iErr
 		}
 		defer conn.Close(ctx)
 
@@ -37,9 +37,9 @@ func initService() error {
 		if err != nil {
 			return err
 		}
-		postgresStorage, err := postgres.NewStorage(ctx, conn)
-		if err != nil {
-			return err
+		postgresStorage, iErr := postgres.NewStorage(ctx, conn)
+		if iErr != nil {
+			return iErr
 		}
 		defer postgresStorage.Close(ctx)
 		metricsStorage = postgresStorage
