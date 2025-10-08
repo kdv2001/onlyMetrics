@@ -84,10 +84,10 @@ func TestMetricsUpdater_updateMetrics(t *testing.T) {
 		in0 context.Context
 	}
 	tests := []struct {
+		wantErr bool
 		name    string
 		fields  fields
 		args    args
-		wantErr bool
 	}{
 		{
 			name: "",

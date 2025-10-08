@@ -82,9 +82,8 @@ func (c *Client) send(ctx context.Context, value domain.MetricValue) error {
 type BodyClient struct {
 	client    httpClient
 	serverURL url.URL
-
-	withGzip bool
-	hh       func([]byte) ([]byte, error)
+	hh        func([]byte) ([]byte, error)
+	withGzip  bool
 }
 
 // clientOption опция клиента.
@@ -144,10 +143,10 @@ func (c *BodyClient) SendCounter(ctx context.Context, value domain.MetricValue) 
 func (c *BodyClient) send(ctx context.Context, value domain.MetricValue) error {
 	sendMetricURL := c.serverURL.JoinPath("update")
 	type metric struct {
-		ID    string   `json:"id"`              // Имя метрики
-		MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 		Delta *int64   `json:"delta,omitempty"` // Значение метрики в случае передачи counter
 		Value *float64 `json:"value,omitempty"` // Значение метрики в случае передачи gauge
+		ID    string   `json:"id"`              // Имя метрики
+		MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 	}
 
 	m := metric{
@@ -212,10 +211,10 @@ func (c *BodyClient) send(ctx context.Context, value domain.MetricValue) error {
 func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricValue) error {
 	sendMetricURL := c.serverURL.JoinPath("updates")
 	type metric struct {
-		ID    string   `json:"id"`              // Имя метрики
-		MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 		Delta *int64   `json:"delta,omitempty"` // Значение метрики в случае передачи counter
 		Value *float64 `json:"value,omitempty"` // Значение метрики в случае передачи gauge
+		ID    string   `json:"id"`              // Имя метрики
+		MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 	}
 
 	res := make([]metric, 0, len(metrics))
