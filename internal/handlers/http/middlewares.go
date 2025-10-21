@@ -18,8 +18,8 @@ import (
 // hashWriter реализация интерфейса writer для перехвата информации ответа, последующего вычисления хэша
 // и добавления вычисленного значения в заголовки.
 type hashWriter struct {
-	key string
 	w   http.ResponseWriter
+	key string
 }
 
 // NewHashWriter ...
@@ -291,10 +291,9 @@ func ResponseMiddleware() func(handler http.Handler) http.Handler {
 
 // WriterWithLogging реализация интерфейса writer для перехвата информации ответа и последующего его логгирования.
 type WriterWithLogging struct {
+	baseWriter   http.ResponseWriter
 	statusCode   int
 	responseSize int
-
-	baseWriter http.ResponseWriter
 }
 
 // NewWriterWithLogging создание нового WriterWithLogging объекта.

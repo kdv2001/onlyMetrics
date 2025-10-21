@@ -116,10 +116,10 @@ func (u *UseCase) sendWorker(job <-chan []domain.MetricValue, wg *sync.WaitGroup
 }
 
 type MetricsUpdater struct {
-	mu          sync.RWMutex
-	stats       []domain.MetricValue
 	pollCount   atomic.Int64
 	randomValue Container[float64]
+	stats       []domain.MetricValue
+	mu          sync.RWMutex
 }
 
 // Container объект для обеспечения безопасного доступ к данным.

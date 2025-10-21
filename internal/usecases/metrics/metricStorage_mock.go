@@ -7,9 +7,9 @@ import (
 )
 
 type mockMetric struct {
-	gaugeValue   float64
-	counterValue int64
 	err          error
+	counterValue int64
+	gaugeValue   float64
 }
 
 func (m *mockMetric) UpdateGauge(_ context.Context, value domain.MetricValue) error {

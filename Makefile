@@ -7,3 +7,11 @@ run-agent:
 
 run-godoc:
 	godoc -http=:8080 -play
+
+build-server:
+	go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildCommit=$(git rev-parse HEAD) -X 'main.buildDate=$(date)'" -o ./cmd/server ./cmd/server
+
+build-agent:
+	go build -ldflags "-X main.buildVersion=v1.0.0 -X main.buildCommit=$(git rev-parse HEAD) -X 'main.buildDate=$(date)'" -o ./cmd/agent ./cmd/agent
+
+build: build-agent build-server

@@ -94,12 +94,12 @@ values ($1,   $2, $3, $4);`,
 
 // metricValue postgres представление метрики.
 type metricValue struct {
-	ID           sql.NullInt64   `db:"id"`
-	MetricName   sql.NullString  `db:"metric_name"`
 	GaugeValue   sql.NullFloat64 `db:"gauge_value"`
 	CounterValue sql.NullInt64   `db:"counter_value"`
-	AgentName    sql.NullString  `db:"agent_name"`
+	ID           sql.NullInt64   `db:"id"`
 	CreatedAt    sql.NullTime    `db:"created_at"`
+	MetricName   sql.NullString  `db:"metric_name"`
+	AgentName    sql.NullString  `db:"agent_name"`
 }
 
 // GetGaugeValue возвращает значение метрики типа "Градусник".

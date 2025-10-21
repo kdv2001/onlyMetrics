@@ -17,14 +17,12 @@ import (
 
 // Storage хранилище метрик.
 type Storage struct {
-	gaugeMu sync.RWMutex
-	gauge   map[string]float64
-
-	counterMu sync.RWMutex
-	counter   map[string]int64
-
-	filePath string
-	period   time.Duration
+	period    time.Duration      // 8 байт (int64 под капотом)
+	gauge     map[string]float64 // 8 байт (64-битный указатель)
+	counter   map[string]int64   // 8 байт (64-битный указатель)
+	filePath  string             // 16 байт (в Go string — это структура {data *byte, len int})
+	counterMu sync.RWMutex       // 24 байта (под капотом sync.Mutex)
+	gaugeMu   sync.RWMutex       // 24 байта}
 }
 
 // NewStorage создает объект хранилища.

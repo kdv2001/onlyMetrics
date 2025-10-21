@@ -78,9 +78,9 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 	var v domain.MetricValue
 	switch t {
 	case domain.GaugeMetricType:
-		mValue, err := strconv.ParseFloat(chi.URLParam(r, ValuePathKey), 64)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		mValue, iErr := strconv.ParseFloat(chi.URLParam(r, ValuePathKey), 64)
+		if iErr != nil {
+			http.Error(w, iErr.Error(), http.StatusBadRequest)
 			return
 		}
 		v = domain.MetricValue{
@@ -89,9 +89,9 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 			GaugeValue: mValue,
 		}
 	case domain.CounterMetricType:
-		mValue, err := strconv.ParseInt(chi.URLParam(r, ValuePathKey), 10, 64)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		mValue, iErr := strconv.ParseInt(chi.URLParam(r, ValuePathKey), 10, 64)
+		if iErr != nil {
+			http.Error(w, iErr.Error(), http.StatusBadRequest)
 			return
 		}
 		v = domain.MetricValue{
@@ -117,10 +117,10 @@ func (h *Handlers) CollectMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 type metric struct {
-	ID    string   `json:"id"`              // Имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty"` // Значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // Значение метрики в случае передачи gauge
+	ID    string   `json:"id"`              // Имя метрики
+	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 }
 
 // CollectBodyMetric обработчик сбора метрик из тела запроса.
@@ -394,9 +394,9 @@ func (h *Handlers) UpdateMetrics(w http.ResponseWriter, r *http.Request) {
 
 	var res []domain.MetricValue
 	for _, parsedMetric := range parsedMetrics {
-		v, err := metricToDomain(parsedMetric)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		v, iErr := metricToDomain(parsedMetric)
+		if iErr != nil {
+			http.Error(w, iErr.Error(), http.StatusBadRequest)
 			return
 		}
 
