@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"path"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -105,10 +107,45 @@ func initService() error {
 
 	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.serverAddr)
 
-	err = http.ListenAndServe(parsedFlags.serverAddr, chiMux)
+	tlsConfig, err := getTLSConfig(parsedFlags.symmetricEncryptionKey)
+	if err != nil {
+		return fmt.Errorf("failed to init tls: %w", err)
+	}
+
+	server := http.Server{
+		Handler:   chiMux,
+		Addr:      parsedFlags.serverAddr,
+		TLSConfig: tlsConfig,
+	}
+
+	if tlsConfig != nil {
+		err = server.ListenAndServeTLS("", "")
+	} else {
+		err = server.ListenAndServe()
+	}
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
+	if privateKeyPath == "" {
+		return nil, nil
+	}
+
+	cert, err := tls.LoadX509KeyPair(path.Join(privateKeyPath, "CERTIFICATE.pem"),
+		path.Join(privateKeyPath, "PRIVATE_KEY.pem"))
+	if err != nil {
+		return nil, fmt.Errorf("error reading server certificate: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{
+			cert,
+		},
+	}
+
+	return tlsConfig, nil
 }

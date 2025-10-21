@@ -9,12 +9,13 @@ import (
 )
 
 type flags struct {
-	serverAddr      string
-	storeInterval   time.Duration
-	fileStoragePath string
-	restoreData     bool
-	postgresDSN     string
-	cryptKey        string
+	serverAddr             string
+	storeInterval          time.Duration
+	fileStoragePath        string
+	restoreData            bool
+	postgresDSN            string
+	cryptKey               string
+	symmetricEncryptionKey string
 }
 
 func initFlags() (flags, error) {
@@ -24,6 +25,7 @@ func initFlags() (flags, error) {
 	restore := flag.Bool("r", false, "The flag to restore data from file")
 	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
 	cryptKey := flag.String("k", "", "crypt request key")
+	symmetricEncryptionKey := flag.String("crypto-key", "", "symmetric encryption key")
 
 	flag.Parse()
 
@@ -85,13 +87,23 @@ func initFlags() (flags, error) {
 		cryptKey = &value
 	}
 
+	symmetricEncryptionKeyKey := "CRYPTO_KEY"
+	if value, exist := os.LookupEnv(symmetricEncryptionKeyKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", symmetricEncryptionKeyKey)
+		}
+
+		symmetricEncryptionKey = &value
+	}
+
 	return flags{
-		serverAddr:      *serverAddr,
-		storeInterval:   time.Duration(*storeInterval) * time.Second,
-		fileStoragePath: *fileStoragePath,
-		restoreData:     *restore,
-		postgresDSN:     *postgresDSN,
-		cryptKey:        *cryptKey,
+		serverAddr:             *serverAddr,
+		storeInterval:          time.Duration(*storeInterval) * time.Second,
+		fileStoragePath:        *fileStoragePath,
+		restoreData:            *restore,
+		postgresDSN:            *postgresDSN,
+		cryptKey:               *cryptKey,
+		symmetricEncryptionKey: *symmetricEncryptionKey,
 	}, nil
 }
 

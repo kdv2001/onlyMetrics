@@ -10,18 +10,17 @@ import (
 )
 
 type flags struct {
-	serverAddr      url.URL
-	reportInterval  time.Duration
-	pollInterval    time.Duration
-	cryptKey        string
-	maxGoroutineNum int64
+	serverAddr             url.URL
+	reportInterval         time.Duration
+	pollInterval           time.Duration
+	cryptKey               string
+	maxGoroutineNum        int64
+	symmetricEncryptionKey string
 }
 
 func initFlags() (flags, error) {
-	scheme := "http"
 	serverAddr := url.URL{
-		Scheme: scheme,
-		Host:   "localhost:8080",
+		Host: "localhost:8080",
 	}
 	flag.Func("a", "metric server address", func(address string) error {
 		if address == "" {
@@ -29,8 +28,7 @@ func initFlags() (flags, error) {
 		}
 
 		serverAddr = url.URL{
-			Scheme: scheme,
-			Host:   address,
+			Host: address,
 		}
 
 		return nil
@@ -39,6 +37,7 @@ func initFlags() (flags, error) {
 	pollInterval := flag.Int64("p", 2, "report poll duration")
 	cryptKey := flag.String("k", "", "crypt request key")
 	maxGoroutineNum := flag.Int64("l", 0, "max goroutine sender num")
+	symmetricEncryptionKey := flag.String("crypto-key", "", "path to CERTIFICATE.pem and PRIVATE_KEY.pem")
 
 	flag.Parse()
 
@@ -48,8 +47,7 @@ func initFlags() (flags, error) {
 		}
 
 		serverAddr = url.URL{
-			Scheme: scheme,
-			Host:   value,
+			Host: value,
 		}
 	}
 
@@ -88,6 +86,15 @@ func initFlags() (flags, error) {
 		cryptKey = &value
 	}
 
+	symmetricEncryptionKeyKey := "CRYPTO_KEY"
+	if value, exist := os.LookupEnv(symmetricEncryptionKeyKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", symmetricEncryptionKeyKey)
+		}
+
+		symmetricEncryptionKey = &value
+	}
+
 	maxGoroutineNumKey := "RATE_LIMIT"
 	if value, exist := os.LookupEnv(maxGoroutineNumKey); exist {
 		if value == "" {
@@ -103,11 +110,12 @@ func initFlags() (flags, error) {
 	}
 
 	return flags{
-		serverAddr:      serverAddr,
-		reportInterval:  time.Duration(*reportInterval) * time.Second,
-		pollInterval:    time.Duration(*pollInterval) * time.Second,
-		cryptKey:        *cryptKey,
-		maxGoroutineNum: *maxGoroutineNum,
+		serverAddr:             serverAddr,
+		reportInterval:         time.Duration(*reportInterval) * time.Second,
+		pollInterval:           time.Duration(*pollInterval) * time.Second,
+		cryptKey:               *cryptKey,
+		maxGoroutineNum:        *maxGoroutineNum,
+		symmetricEncryptionKey: *symmetricEncryptionKey,
 	}, nil
 }
 
