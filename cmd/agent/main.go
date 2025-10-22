@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,6 +31,13 @@ func main() {
 	fmt.Printf("Build date: %s\n", opIf(buildDate != "", buildDate, na))
 	fmt.Printf("Build commit: %s\n", opIf(buildCommit != "", buildCommit, na))
 
+	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(ctx,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	defer cancel()
+
 	parsedFlags, err := initFlags()
 	if err != nil {
 		log.Fatal(err)
@@ -49,7 +58,8 @@ func main() {
 		log.Fatal("failed to init logger: %w", err)
 	}
 
-	ctx := logger.ToContext(context.Background(), zapLog.Sugar())
+	sugarLogger := zapLog.Sugar()
+	ctx = logger.ToContext(ctx, sugarLogger)
 
 	metric := agent.NewMetricsUpdater(ctx, parsedFlags.PollInterval.asTimeDuration())
 
@@ -70,7 +80,10 @@ func main() {
 		metric,
 		parsedFlags.ReportInterval.asTimeDuration(),
 		parsedFlags.MaxGoroutineNum)
-	_ = metricsUC.SendMetrics(context.TODO())
+	err = metricsUC.SendMetrics(ctx)
+	if err != nil {
+		sugarLogger.Errorf("failed to send metrics: %v", err)
+	}
 }
 
 func opIf[T comparable](cond bool, a T, b T) T {

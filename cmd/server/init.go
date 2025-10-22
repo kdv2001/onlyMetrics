@@ -5,7 +5,9 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os/signal"
 	"path"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -22,6 +24,13 @@ import (
 
 func initService() error {
 	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(ctx,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	defer cancel()
+	graceFullShutDown := make(chan struct{})
+
 	parsedFlags, err := initFlags()
 	if err != nil {
 		return fmt.Errorf("failed to init flags: %w", err)
@@ -120,6 +129,16 @@ func initService() error {
 		TLSConfig: tlsConfig,
 	}
 
+	go func() {
+		<-ctx.Done()
+		shutDownErr := server.Shutdown(ctx)
+		if shutDownErr != nil {
+			sugarLogger.Errorf("failed to shut down http server: %v", shutDownErr)
+		}
+
+		close(graceFullShutDown)
+	}()
+
 	if tlsConfig != nil {
 		err = server.ListenAndServeTLS("", "")
 	} else {
@@ -128,6 +147,8 @@ func initService() error {
 	if err != nil {
 		return err
 	}
+
+	<-graceFullShutDown
 
 	return nil
 }
