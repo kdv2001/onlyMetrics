@@ -28,8 +28,8 @@ func initService() error {
 	}
 
 	var metricsStorage metrics.MetricStorage
-	if parsedFlags.postgresDSN != "" {
-		conn, iErr := pgx.Connect(ctx, parsedFlags.postgresDSN)
+	if parsedFlags.PostgresDSN != "" {
+		conn, iErr := pgx.Connect(ctx, parsedFlags.PostgresDSN)
 		if iErr != nil {
 			return iErr
 		}
@@ -46,8 +46,10 @@ func initService() error {
 		defer postgresStorage.Close(ctx)
 		metricsStorage = postgresStorage
 	} else {
-		memoryStorage := memory.NewStorage(ctx, parsedFlags.fileStoragePath,
-			parsedFlags.storeInterval, parsedFlags.restoreData)
+		memoryStorage := memory.NewStorage(ctx,
+			parsedFlags.FileStoragePath,
+			parsedFlags.StoreInterval.asTimeDuration(),
+			parsedFlags.RestoreData)
 		defer memoryStorage.Close(ctx)
 		metricsStorage = memoryStorage
 	}
@@ -60,8 +62,8 @@ func initService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
-	if parsedFlags.cryptKey != "" {
-		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.cryptKey))
+	if parsedFlags.CryptKey != "" {
+		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.CryptKey))
 	}
 
 	sugarLogger := log.Sugar()
@@ -105,16 +107,16 @@ func initService() error {
 
 	chiMux.Get("/swagger/*", httpSwagger.Handler())
 
-	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.serverAddr)
+	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.ServerAddr)
 
-	tlsConfig, err := getTLSConfig(parsedFlags.symmetricEncryptionKey)
+	tlsConfig, err := getTLSConfig(parsedFlags.SymmetricEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to init tls: %w", err)
 	}
 
 	server := http.Server{
 		Handler:   chiMux,
-		Addr:      parsedFlags.serverAddr,
+		Addr:      parsedFlags.ServerAddr,
 		TLSConfig: tlsConfig,
 	}
 

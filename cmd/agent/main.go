@@ -34,7 +34,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	transport, err := getHTTPTransport(parsedFlags.symmetricEncryptionKey)
+	transport, err := getHTTPTransport(parsedFlags.SymmetricEncryptionKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,22 +51,25 @@ func main() {
 
 	ctx := logger.ToContext(context.Background(), zapLog.Sugar())
 
-	metric := agent.NewMetricsUpdater(ctx, parsedFlags.pollInterval)
+	metric := agent.NewMetricsUpdater(ctx, parsedFlags.PollInterval.asTimeDuration())
 
 	scheme := clients.HTTP
-	if parsedFlags.symmetricEncryptionKey != "" {
+	if parsedFlags.SymmetricEncryptionKey != "" {
 		scheme = clients.HTTPS
 	}
 
 	metricsHTTPClient := metricsHTTP.NewBodyClient(
 		httpClient,
-		parsedFlags.serverAddr,
+		parsedFlags.ServerAddr,
 		metricsHTTP.CompresGZIPOpt(),
-		metricsHTTP.WithSHA256Opt(parsedFlags.cryptKey),
+		metricsHTTP.WithSHA256Opt(parsedFlags.CryptKey),
 		metricsHTTP.SetRequestScheme(scheme),
 	)
 
-	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, parsedFlags.reportInterval, parsedFlags.maxGoroutineNum)
+	metricsUC := agent.NewUseCase(metricsHTTPClient,
+		metric,
+		parsedFlags.ReportInterval.asTimeDuration(),
+		parsedFlags.MaxGoroutineNum)
 	_ = metricsUC.SendMetrics(context.TODO())
 }
 

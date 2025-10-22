@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -9,13 +11,43 @@ import (
 )
 
 type flags struct {
-	serverAddr             string
-	storeInterval          time.Duration
-	fileStoragePath        string
-	restoreData            bool
-	postgresDSN            string
-	cryptKey               string
-	symmetricEncryptionKey string
+	ServerAddr             string   `json:"address"`
+	StoreInterval          duration `json:"store_interval"`
+	FileStoragePath        string   `json:"store_file"`
+	RestoreData            bool     `json:"restore"`
+	PostgresDSN            string   `json:"database_dsn"`
+	CryptKey               string   `json:"crypto_key"`
+	SymmetricEncryptionKey string   `json:"symmetric_encryption_key"`
+}
+
+type duration time.Duration
+
+func (d *duration) UnmarshalJSON(b []byte) error {
+	var v interface{}
+	if err := json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+	switch value := v.(type) {
+	case float64:
+		*d = duration(time.Duration(value))
+		return nil
+	case string:
+		tmp, err := time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+		*d = duration(tmp)
+		return nil
+	default:
+		return errors.New("invalid duration")
+	}
+}
+
+func (d *duration) asTimeDuration() time.Duration {
+	if d == nil {
+		return time.Duration(0)
+	}
+	return time.Duration(*d)
 }
 
 func initFlags() (flags, error) {
@@ -26,6 +58,7 @@ func initFlags() (flags, error) {
 	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
 	cryptKey := flag.String("k", "", "crypt request key")
 	symmetricEncryptionKey := flag.String("crypto-key", "", "symmetric encryption key")
+	configFilePath := flag.String("config", "", "config file path")
 
 	flag.Parse()
 
@@ -96,14 +129,37 @@ func initFlags() (flags, error) {
 		symmetricEncryptionKey = &value
 	}
 
+	configFilePathKey := "CONFIG"
+	if value, exist := os.LookupEnv(configFilePathKey); exist {
+		if value == "" {
+			return flags{}, fmt.Errorf("%s environment variable not set", configFilePathKey)
+		}
+
+		configFilePath = &value
+	}
+
+	configFileFlags := flags{}
+	if *configFilePath != "" {
+		var err error
+		configFileFlags, err = getFileConfig(*configFilePath)
+		if err != nil {
+			return flags{}, err
+		}
+	}
+
+	// если есть пустые значения и задан конфиг, заполняем значениями из конфига
+	storeIntervalDur := duration(time.Duration(*storeInterval) * time.Second)
 	return flags{
-		serverAddr:             *serverAddr,
-		storeInterval:          time.Duration(*storeInterval) * time.Second,
-		fileStoragePath:        *fileStoragePath,
-		restoreData:            *restore,
-		postgresDSN:            *postgresDSN,
-		cryptKey:               *cryptKey,
-		symmetricEncryptionKey: *symmetricEncryptionKey,
+		ServerAddr: opIf(*serverAddr != "", *serverAddr, configFileFlags.ServerAddr),
+		StoreInterval: opIf(
+			storeIntervalDur != duration(time.Duration(0)),
+			storeIntervalDur,
+			configFileFlags.StoreInterval),
+		FileStoragePath:        opIf(*fileStoragePath != "", *fileStoragePath, configFileFlags.FileStoragePath),
+		RestoreData:            opIf(*restore, *restore, configFileFlags.RestoreData),
+		PostgresDSN:            opIf(*postgresDSN != "", *postgresDSN, configFileFlags.PostgresDSN),
+		CryptKey:               opIf(*cryptKey != "", *cryptKey, configFileFlags.CryptKey),
+		SymmetricEncryptionKey: opIf(*symmetricEncryptionKey != "", *symmetricEncryptionKey, configFileFlags.SymmetricEncryptionKey),
 	}, nil
 }
 
@@ -117,4 +173,19 @@ func parseIntervalValue(value string) (int64, error) {
 	}
 
 	return intValue, nil
+}
+
+func getFileConfig(path string) (flags, error) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return flags{}, fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+
+	f := flags{}
+	err = json.Unmarshal(bytes, &f)
+	if err != nil {
+		return flags{}, fmt.Errorf("failed to unmarshal %s: %w", path, err)
+	}
+
+	return f, nil
 }
