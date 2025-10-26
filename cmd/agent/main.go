@@ -18,6 +18,7 @@ import (
 	metricsHTTP "github.com/kdv2001/onlyMetrics/internal/clients/metrics/http"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/agent"
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/operators"
 )
 
 var buildVersion string
@@ -27,9 +28,9 @@ var buildCommit string
 const na = "N/A"
 
 func main() {
-	fmt.Printf("Build version: %s\n", opIf(buildVersion != "", buildVersion, na))
-	fmt.Printf("Build date: %s\n", opIf(buildDate != "", buildDate, na))
-	fmt.Printf("Build commit: %s\n", opIf(buildCommit != "", buildCommit, na))
+	fmt.Printf("Build version: %s\n", operators.OpIf(buildVersion != "", buildVersion, na))
+	fmt.Printf("Build date: %s\n", operators.OpIf(buildDate != "", buildDate, na))
+	fmt.Printf("Build commit: %s\n", operators.OpIf(buildCommit != "", buildCommit, na))
 
 	ctx := context.Background()
 	ctx, cancel := signal.NotifyContext(ctx,
@@ -61,7 +62,7 @@ func main() {
 	sugarLogger := zapLog.Sugar()
 	ctx = logger.ToContext(ctx, sugarLogger)
 
-	metric := agent.NewMetricsUpdater(ctx, parsedFlags.PollInterval.asTimeDuration())
+	metric := agent.NewMetricsUpdater(ctx, parsedFlags.PollInterval.AsTimeDuration())
 
 	scheme := clients.HTTP
 	if parsedFlags.SymmetricEncryptionKey != "" {
@@ -70,7 +71,7 @@ func main() {
 
 	metricsHTTPClient := metricsHTTP.NewBodyClient(
 		httpClient,
-		parsedFlags.ServerAddr,
+		parsedFlags.ServerAddr.AsURL(),
 		metricsHTTP.CompresGZIPOpt(),
 		metricsHTTP.WithSHA256Opt(parsedFlags.CryptKey),
 		metricsHTTP.SetRequestScheme(scheme),
@@ -78,20 +79,12 @@ func main() {
 
 	metricsUC := agent.NewUseCase(metricsHTTPClient,
 		metric,
-		parsedFlags.ReportInterval.asTimeDuration(),
+		parsedFlags.ReportInterval.AsTimeDuration(),
 		parsedFlags.MaxGoroutineNum)
 	err = metricsUC.SendMetrics(ctx)
 	if err != nil {
-		sugarLogger.Errorf("failed to send metrics: %v", err)
+		log.Fatalf("failed to send metrics: %v", err)
 	}
-}
-
-func opIf[T comparable](cond bool, a T, b T) T {
-	if cond {
-		return a
-	}
-
-	return b
 }
 
 func getHTTPTransport(TLSCertificatePath string) (http.RoundTripper, error) {
@@ -102,7 +95,7 @@ func getHTTPTransport(TLSCertificatePath string) (http.RoundTripper, error) {
 
 	caCert, err := os.ReadFile(TLSCertificatePath)
 	if err != nil {
-		log.Fatalf("Error reading server certificate: %v", err)
+		return nil, fmt.Errorf("error reading server certificate: %w", err)
 	}
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)

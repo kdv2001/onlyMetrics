@@ -57,7 +57,7 @@ func initService() error {
 	} else {
 		memoryStorage := memory.NewStorage(ctx,
 			parsedFlags.FileStoragePath,
-			parsedFlags.StoreInterval.asTimeDuration(),
+			parsedFlags.StoreInterval.AsTimeDuration(),
 			parsedFlags.RestoreData)
 		defer memoryStorage.Close(ctx)
 		metricsStorage = memoryStorage
@@ -158,7 +158,8 @@ func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
 		return nil, nil
 	}
 
-	cert, err := tls.LoadX509KeyPair(path.Join(privateKeyPath, "CERTIFICATE.pem"),
+	cert, err := tls.LoadX509KeyPair(
+		path.Join(privateKeyPath, "CERTIFICATE.pem"),
 		path.Join(privateKeyPath, "PRIVATE_KEY.pem"))
 	if err != nil {
 		return nil, fmt.Errorf("error reading server certificate: %w", err)
