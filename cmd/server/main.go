@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+
+	"github.com/kdv2001/onlyMetrics/pkg/operators"
 )
 
 var buildVersion string
@@ -12,19 +14,11 @@ var buildCommit string
 const na = "N/A"
 
 func main() {
-	fmt.Printf("Build version: %s\n", opIf(buildVersion != "", buildVersion, na))
-	fmt.Printf("Build date: %s\n", opIf(buildDate != "", buildDate, na))
-	fmt.Printf("Build commit: %s\n", opIf(buildCommit != "", buildCommit, na))
+	fmt.Printf("Build version: %s\n", operators.OpIf(buildVersion != "", buildVersion, na))
+	fmt.Printf("Build date: %s\n", operators.OpIf(buildDate != "", buildDate, na))
+	fmt.Printf("Build commit: %s\n", operators.OpIf(buildCommit != "", buildCommit, na))
 
 	if err := initService(); err != nil {
 		log.Fatalf("failed to initialize service: %v", err)
 	}
-}
-
-func opIf[T comparable](cond bool, a T, b T) T {
-	if cond {
-		return a
-	}
-
-	return b
 }

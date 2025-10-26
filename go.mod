@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.6
 
 require (
+	dario.cat/mergo v1.0.2
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438
 	github.com/jackc/pgx/v5 v5.7.1
