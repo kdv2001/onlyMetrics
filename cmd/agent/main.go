@@ -2,16 +2,23 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/kdv2001/onlyMetrics/internal/clients"
 	metricsHTTP "github.com/kdv2001/onlyMetrics/internal/clients/metrics/http"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/agent"
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/operators"
 )
 
 var buildVersion string
@@ -21,41 +28,83 @@ var buildCommit string
 const na = "N/A"
 
 func main() {
-	fmt.Printf("Build version: %s\n", opIf(buildVersion != "", buildVersion, na))
-	fmt.Printf("Build date: %s\n", opIf(buildDate != "", buildDate, na))
-	fmt.Printf("Build commit: %s\n", opIf(buildCommit != "", buildCommit, na))
+	fmt.Printf("Build version: %s\n", operators.OpIf(buildVersion != "", buildVersion, na))
+	fmt.Printf("Build date: %s\n", operators.OpIf(buildDate != "", buildDate, na))
+	fmt.Printf("Build commit: %s\n", operators.OpIf(buildCommit != "", buildCommit, na))
 
-	httpClient := &http.Client{
-		Timeout: time.Second * 5,
-	}
-	zapLog, err := zap.NewDevelopment()
-	if err != nil {
-		log.Fatal("failed to init logger: %w", err)
-	}
-
-	ctx := logger.ToContext(context.Background(), zapLog.Sugar())
+	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(ctx,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	defer cancel()
 
 	parsedFlags, err := initFlags()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	metric := agent.NewMetricsUpdater(ctx, parsedFlags.pollInterval)
-	metricsHTTPClient := metricsHTTP.NewBodyClient(
-		httpClient,
-		parsedFlags.serverAddr,
-		metricsHTTP.CompresGZIPOpt(),
-		metricsHTTP.WithSHA256Opt(parsedFlags.cryptKey),
-	)
-
-	metricsUC := agent.NewUseCase(metricsHTTPClient, metric, parsedFlags.reportInterval, parsedFlags.maxGoroutineNum)
-	_ = metricsUC.SendMetrics(context.TODO())
-}
-
-func opIf[T comparable](cond bool, a T, b T) T {
-	if cond {
-		return a
+	transport, err := getHTTPTransport(parsedFlags.SymmetricEncryptionKey)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	return b
+	httpClient := &http.Client{
+		Timeout:   time.Second * 5,
+		Transport: transport,
+	}
+
+	zapLog, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal("failed to init logger: %w", err)
+	}
+
+	sugarLogger := zapLog.Sugar()
+	ctx = logger.ToContext(ctx, sugarLogger)
+
+	metric := agent.NewMetricsUpdater(ctx, parsedFlags.PollInterval.AsTimeDuration())
+
+	scheme := clients.HTTP
+	if parsedFlags.SymmetricEncryptionKey != "" {
+		scheme = clients.HTTPS
+	}
+
+	metricsHTTPClient := metricsHTTP.NewBodyClient(
+		httpClient,
+		parsedFlags.ServerAddr.AsURL(),
+		metricsHTTP.CompresGZIPOpt(),
+		metricsHTTP.WithSHA256Opt(parsedFlags.CryptKey),
+		metricsHTTP.SetRequestScheme(scheme),
+	)
+
+	metricsUC := agent.NewUseCase(metricsHTTPClient,
+		metric,
+		parsedFlags.ReportInterval.AsTimeDuration(),
+		parsedFlags.MaxGoroutineNum)
+	err = metricsUC.SendMetrics(ctx)
+	if err != nil {
+		log.Fatalf("failed to send metrics: %v", err)
+	}
+}
+
+func getHTTPTransport(TLSCertificatePath string) (http.RoundTripper, error) {
+	transport := http.DefaultTransport
+	if TLSCertificatePath == "" {
+		return transport, nil
+	}
+
+	caCert, err := os.ReadFile(TLSCertificatePath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading server certificate: %w", err)
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}, nil
+
 }

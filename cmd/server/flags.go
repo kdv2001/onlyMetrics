@@ -1,108 +1,70 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"os"
-	"strconv"
-	"time"
+	"dario.cat/mergo"
+
+	"github.com/kdv2001/onlyMetrics/pkg/config"
 )
 
 type flags struct {
-	serverAddr      string
-	storeInterval   time.Duration
-	fileStoragePath string
-	restoreData     bool
-	postgresDSN     string
-	cryptKey        string
+	ServerAddr             string           `default:":8080" env:"ADDRESS" flag:"a;;The address to bind the server to" json:"address"`
+	StoreInterval          *config.Duration `default:"300" env:"STORE_INTERVAL" flag:"i;;The interval to save data to file" json:"store_interval"`
+	FileStoragePath        string           `default:"data.txt" env:"FILE_STORAGE_PATH" flag:"f;;The address to metric file" json:"store_file"`
+	RestoreData            bool             `env:"RESTORE" flag:"r;;The flag to restore data from file" json:"restore"`
+	PostgresDSN            string           `env:"DATABASE_DSN" flag:"d;;The flag to Postgres DSN" json:"database_dsn"`
+	CryptKey               string           `env:"KEY" flag:"k;;crypt request key" json:"key"`
+	SymmetricEncryptionKey string           `env:"CRYPTO_KEY" flag:"crypto-key;;symmetric encryption key" json:"symmetric_encryption_key"`
+	ConfigFilePath         string           `env:"CONFIG" flag:"config;;config file path"`
 }
 
-func initFlags() (flags, error) {
-	serverAddr := flag.String("a", ":8080", "The address to bind the server to")
-	storeInterval := flag.Int64("i", 300, "The interval to save data to file")
-	fileStoragePath := flag.String("f", "data.txt", "The address to metric file")
-	restore := flag.Bool("r", false, "The flag to restore data from file")
-	postgresDSN := flag.String("d", "", "The flag to Postgres DSN")
-	cryptKey := flag.String("k", "", "crypt request key")
-
-	flag.Parse()
-
-	if value := os.Getenv("ADDRESS"); value != "" {
-		serverAddr = &value
+func makeFlags() *flags {
+	return &flags{
+		StoreInterval: new(config.Duration),
 	}
-
-	storeIntervalKey := "STORE_INTERVAL"
-	if value, exist := os.LookupEnv(storeIntervalKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", storeIntervalKey)
-		}
-
-		val, err := parseIntervalValue(value)
-		if err != nil {
-			return flags{}, fmt.Errorf("failed to parse %s: %w", storeIntervalKey, err)
-		}
-		storeInterval = &val
-	}
-
-	fileStoragePathKey := "FILE_STORAGE_PATH"
-	if value, exist := os.LookupEnv(fileStoragePathKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", fileStoragePathKey)
-		}
-
-		fileStoragePath = &value
-	}
-
-	restoreKey := "RESTORE"
-	if value, exist := os.LookupEnv(restoreKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", restoreKey)
-		}
-
-		res, err := strconv.ParseBool(value)
-		if err != nil {
-			return flags{}, fmt.Errorf("can not parse %s environment variable: %w", restoreKey, err)
-		}
-
-		restore = &res
-	}
-
-	dataBaseDSNKey := "DATABASE_DSN"
-	if value, exist := os.LookupEnv(dataBaseDSNKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", dataBaseDSNKey)
-		}
-
-		postgresDSN = &value
-	}
-
-	cryptKeyKey := "KEY"
-	if value, exist := os.LookupEnv(cryptKeyKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", cryptKeyKey)
-		}
-
-		cryptKey = &value
-	}
-
-	return flags{
-		serverAddr:      *serverAddr,
-		storeInterval:   time.Duration(*storeInterval) * time.Second,
-		fileStoragePath: *fileStoragePath,
-		restoreData:     *restore,
-		postgresDSN:     *postgresDSN,
-		cryptKey:        *cryptKey,
-	}, nil
 }
 
-func parseIntervalValue(value string) (int64, error) {
-	intValue, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse %s: %w", value, err)
-	}
-	if intValue <= 0 {
-		return 0, fmt.Errorf("invalid POLL_INTERVAL: %s", value)
+func initFlags() (*flags, error) {
+	resultFlags := makeFlags()
+
+	// парсим аргументы программы
+	env := makeFlags()
+	if err := config.UnmarshalEnv(env); err != nil {
+		return nil, err
 	}
 
-	return intValue, nil
+	if err := mergo.Merge(resultFlags, env); err != nil {
+		return nil, err
+	}
+
+	// парсим переменные окружения
+	parsedFlags := makeFlags()
+	if err := config.UnmarshalFlags(parsedFlags); err != nil {
+		return nil, err
+	}
+
+	if err := mergo.Merge(resultFlags, parsedFlags); err != nil {
+		return nil, err
+	}
+
+	// парсим значения из конфига
+	configFilePath := resultFlags.ConfigFilePath
+
+	configFileFlags := makeFlags()
+	if configFilePath != "" {
+		err := config.UnmarshalJSONFile(configFileFlags, configFilePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := mergo.Merge(resultFlags, configFileFlags); err != nil {
+		return nil, err
+	}
+
+	// устанавливаем дефолт значения
+	if err := config.SetDefaultValues(resultFlags); err != nil {
+		return nil, err
+	}
+
+	return resultFlags, nil
 }

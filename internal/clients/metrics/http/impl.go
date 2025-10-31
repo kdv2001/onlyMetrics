@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/kdv2001/onlyMetrics/internal/clients"
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 )
 
@@ -113,6 +114,13 @@ func WithSHA256Opt(key string) clientOption {
 			}
 			return hh.Sum(nil), nil
 		}
+	}
+}
+
+// SetRequestScheme устанавливает схему запросов
+func SetRequestScheme(scheme clients.Scheme) clientOption {
+	return func(c *BodyClient) {
+		c.serverURL.Scheme = scheme.String()
 	}
 }
 

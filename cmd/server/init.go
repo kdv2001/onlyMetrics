@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"os/signal"
+	"path"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -20,14 +24,21 @@ import (
 
 func initService() error {
 	ctx := context.Background()
+	ctx, cancel := signal.NotifyContext(ctx,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	defer cancel()
+	graceFullShutDown := make(chan struct{})
+
 	parsedFlags, err := initFlags()
 	if err != nil {
 		return fmt.Errorf("failed to init flags: %w", err)
 	}
 
 	var metricsStorage metrics.MetricStorage
-	if parsedFlags.postgresDSN != "" {
-		conn, iErr := pgx.Connect(ctx, parsedFlags.postgresDSN)
+	if parsedFlags.PostgresDSN != "" {
+		conn, iErr := pgx.Connect(ctx, parsedFlags.PostgresDSN)
 		if iErr != nil {
 			return iErr
 		}
@@ -44,8 +55,10 @@ func initService() error {
 		defer postgresStorage.Close(ctx)
 		metricsStorage = postgresStorage
 	} else {
-		memoryStorage := memory.NewStorage(ctx, parsedFlags.fileStoragePath,
-			parsedFlags.storeInterval, parsedFlags.restoreData)
+		memoryStorage := memory.NewStorage(ctx,
+			parsedFlags.FileStoragePath,
+			parsedFlags.StoreInterval.AsTimeDuration(),
+			parsedFlags.RestoreData)
 		defer memoryStorage.Close(ctx)
 		metricsStorage = memoryStorage
 	}
@@ -58,8 +71,8 @@ func initService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
-	if parsedFlags.cryptKey != "" {
-		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.cryptKey))
+	if parsedFlags.CryptKey != "" {
+		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.CryptKey))
 	}
 
 	sugarLogger := log.Sugar()
@@ -103,12 +116,60 @@ func initService() error {
 
 	chiMux.Get("/swagger/*", httpSwagger.Handler())
 
-	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.serverAddr)
+	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.ServerAddr)
 
-	err = http.ListenAndServe(parsedFlags.serverAddr, chiMux)
+	tlsConfig, err := getTLSConfig(parsedFlags.SymmetricEncryptionKey)
+	if err != nil {
+		return fmt.Errorf("failed to init tls: %w", err)
+	}
+
+	server := http.Server{
+		Handler:   chiMux,
+		Addr:      parsedFlags.ServerAddr,
+		TLSConfig: tlsConfig,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutDownErr := server.Shutdown(ctx)
+		if shutDownErr != nil {
+			sugarLogger.Errorf("failed to shut down http server: %v", shutDownErr)
+		}
+
+		close(graceFullShutDown)
+	}()
+
+	if tlsConfig != nil {
+		err = server.ListenAndServeTLS("", "")
+	} else {
+		err = server.ListenAndServe()
+	}
 	if err != nil {
 		return err
 	}
 
+	<-graceFullShutDown
+
 	return nil
+}
+
+func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
+	if privateKeyPath == "" {
+		return nil, nil
+	}
+
+	cert, err := tls.LoadX509KeyPair(
+		path.Join(privateKeyPath, "CERTIFICATE.pem"),
+		path.Join(privateKeyPath, "PRIVATE_KEY.pem"))
+	if err != nil {
+		return nil, fmt.Errorf("error reading server certificate: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{
+			cert,
+		},
+	}
+
+	return tlsConfig, nil
 }

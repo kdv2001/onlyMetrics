@@ -1,124 +1,71 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"net/url"
-	"os"
-	"strconv"
-	"time"
+	"dario.cat/mergo"
+
+	"github.com/kdv2001/onlyMetrics/pkg/config"
 )
 
 type flags struct {
-	serverAddr      url.URL
-	reportInterval  time.Duration
-	pollInterval    time.Duration
-	cryptKey        string
-	maxGoroutineNum int64
+	ServerAddr             *config.URL      `env:"ADDRESS" flag:"a;;metric server address" default:"localhost:8080" json:"address"`
+	ReportInterval         *config.Duration `env:"REPORT_INTERVAL" flag:"r;;report interval Duration" default:"10" json:"report_interval"`
+	PollInterval           *config.Duration `env:"POLL_INTERVAL" flag:"p;;report poll Duration" default:"2" json:"poll_interval"`
+	CryptKey               string           `env:"KEY" flag:"k;;crypt request key" json:"key"`
+	MaxGoroutineNum        int64            `env:"RATE_LIMIT" flag:"l;;max goroutine sender num" default:"0" json:"max_goroutine_num"`
+	SymmetricEncryptionKey string           `env:"CRYPTO_KEY" flag:"crypto-key;;path to CERTIFICATE.pem and PRIVATE_KEY.pem" json:"symmetric_encryption_key"`
+	Config                 string           `env:"CONFIG" flag:"config;;config file path" json:"config"`
 }
 
-func initFlags() (flags, error) {
-	scheme := "http"
-	serverAddr := url.URL{
-		Scheme: scheme,
-		Host:   "localhost:8080",
+func makeFlags() *flags {
+	return &flags{
+		ServerAddr:     new(config.URL),
+		ReportInterval: new(config.Duration),
+		PollInterval:   new(config.Duration),
 	}
-	flag.Func("a", "metric server address", func(address string) error {
-		if address == "" {
-			return nil
-		}
-
-		serverAddr = url.URL{
-			Scheme: scheme,
-			Host:   address,
-		}
-
-		return nil
-	})
-	reportInterval := flag.Int64("r", 10, "report interval duration")
-	pollInterval := flag.Int64("p", 2, "report poll duration")
-	cryptKey := flag.String("k", "", "crypt request key")
-	maxGoroutineNum := flag.Int64("l", 0, "max goroutine sender num")
-
-	flag.Parse()
-
-	if value, exist := os.LookupEnv("ADDRESS"); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("ADDRESS environment variable not set")
-		}
-
-		serverAddr = url.URL{
-			Scheme: scheme,
-			Host:   value,
-		}
-	}
-
-	reportIntervalKey := "REPORT_INTERVAL"
-	if value, exist := os.LookupEnv(reportIntervalKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", reportIntervalKey)
-		}
-
-		val, err := parseIntervalValue(value)
-		if err != nil {
-			return flags{}, fmt.Errorf("failed to parse %s: %w", reportIntervalKey, err)
-		}
-		reportInterval = &val
-	}
-
-	poolIntervalKey := "POLL_INTERVAL"
-	if value, exist := os.LookupEnv(poolIntervalKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", poolIntervalKey)
-		}
-
-		val, err := parseIntervalValue(value)
-		if err != nil {
-			return flags{}, fmt.Errorf("failed to parse %s: %w", poolIntervalKey, err)
-		}
-		pollInterval = &val
-	}
-
-	cryptKeyKey := "KEY"
-	if value, exist := os.LookupEnv(cryptKeyKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", cryptKeyKey)
-		}
-
-		cryptKey = &value
-	}
-
-	maxGoroutineNumKey := "RATE_LIMIT"
-	if value, exist := os.LookupEnv(maxGoroutineNumKey); exist {
-		if value == "" {
-			return flags{}, fmt.Errorf("%s environment variable not set", maxGoroutineNumKey)
-		}
-
-		intValue, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return flags{}, fmt.Errorf("failed to parse %s: %w", maxGoroutineNumKey, err)
-		}
-
-		maxGoroutineNum = &intValue
-	}
-
-	return flags{
-		serverAddr:      serverAddr,
-		reportInterval:  time.Duration(*reportInterval) * time.Second,
-		pollInterval:    time.Duration(*pollInterval) * time.Second,
-		cryptKey:        *cryptKey,
-		maxGoroutineNum: *maxGoroutineNum,
-	}, nil
 }
 
-func parseIntervalValue(value string) (int64, error) {
-	intValue, err := strconv.ParseInt(value, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse %s: %w", value, err)
-	}
-	if intValue <= 0 {
-		return 0, fmt.Errorf("invalid POLL_INTERVAL: %s", value)
+func initFlags() (*flags, error) {
+	resultFlags := makeFlags()
+
+	// парсим аргументы программы
+	env := makeFlags()
+	if err := config.UnmarshalEnv(env); err != nil {
+		return nil, err
 	}
 
-	return intValue, nil
+	if err := mergo.Merge(resultFlags, env); err != nil {
+		return nil, err
+	}
+
+	// парсим переменные окружения
+	parsedFlags := makeFlags()
+	if err := config.UnmarshalFlags(parsedFlags); err != nil {
+		return nil, err
+	}
+
+	if err := mergo.Merge(resultFlags, parsedFlags); err != nil {
+		return nil, err
+	}
+
+	// парсим значения из конфига
+	configFilePath := resultFlags.Config
+
+	configFileFlags := makeFlags()
+	if configFilePath != "" {
+		err := config.UnmarshalJSONFile(configFileFlags, configFilePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := mergo.Merge(resultFlags, configFileFlags); err != nil {
+		return nil, err
+	}
+
+	// устанавливаем дефолт значения
+	if err := config.SetDefaultValues(resultFlags); err != nil {
+		return nil, err
+	}
+
+	return resultFlags, nil
 }
