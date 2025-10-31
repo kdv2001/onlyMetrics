@@ -71,6 +71,19 @@ func initService() error {
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
 	}
+
+	chiMux.Use(
+		sericeHttp.ResponseMiddleware(),
+		sericeHttp.RequestMiddleware())
+
+	if parsedFlags.CIDR != "" {
+		mw, err := sericeHttp.NewSubNetMiddleware(parsedFlags.CIDR)
+		if err != nil {
+			return fmt.Errorf("failed to init ubNetMiddleware: %w", err)
+		}
+		chiMux.Use(mw)
+
+	}
 	if parsedFlags.CryptKey != "" {
 		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.CryptKey))
 	}
@@ -79,9 +92,7 @@ func initService() error {
 	chiMux.Use(
 		sericeHttp.CompressMiddleware(sericeHttp.GetDefaultAcceptedEncodingData()),
 		sericeHttp.DecompressMiddleware(),
-		sericeHttp.AddLoggerToContextMiddleware(sugarLogger),
-		sericeHttp.ResponseMiddleware(),
-		sericeHttp.RequestMiddleware())
+		sericeHttp.AddLoggerToContextMiddleware(sugarLogger))
 
 	chiMux.Get("/", httpHandlers.GetAllMetric)
 

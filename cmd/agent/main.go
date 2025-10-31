@@ -18,6 +18,7 @@ import (
 	metricsHTTP "github.com/kdv2001/onlyMetrics/internal/clients/metrics/http"
 	"github.com/kdv2001/onlyMetrics/internal/usecases/agent"
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/network"
 	"github.com/kdv2001/onlyMetrics/pkg/operators"
 )
 
@@ -69,12 +70,18 @@ func main() {
 		scheme = clients.HTTPS
 	}
 
+	ip, err := network.GetLocalIP()
+	if err != nil {
+		sugarLogger.Errorf("failed to get local IP address %v", err)
+	}
+
 	metricsHTTPClient := metricsHTTP.NewBodyClient(
 		httpClient,
 		parsedFlags.ServerAddr.AsURL(),
 		metricsHTTP.CompresGZIPOpt(),
 		metricsHTTP.WithSHA256Opt(parsedFlags.CryptKey),
 		metricsHTTP.SetRequestScheme(scheme),
+		metricsHTTP.SetRealIPHeader(ip),
 	)
 
 	metricsUC := agent.NewUseCase(metricsHTTPClient,
