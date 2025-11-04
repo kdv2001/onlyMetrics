@@ -323,7 +323,7 @@ func (w *WriterWithLogging) Header() http.Header {
 	return w.baseWriter.Header()
 }
 
-// NewSubNetMiddleware создает Middleware для проверки принадлежности запрос клиента подсети
+// NewSubNetMiddleware создает Middleware для проверки принадлежности запрос клиента к подсети
 func NewSubNetMiddleware(cidr string) (func(handler http.Handler) http.Handler, error) {
 	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {

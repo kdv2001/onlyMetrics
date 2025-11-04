@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package demo;
+
+// TODO поменять пакет
+option go_package = "internal/gen/protogen/only_metrics/grpc";
+
+// MetricType тип метрики
+enum MetricType {
+  UNSPECIFIED_METRIC_TYPE = 0;
+  GAUGE_METRIC_TYPE = 1;
+  COUNTER_METRIC_TYPE = 2;
+}
+
+service OnlyMetrics {
+  rpc GetAllMetrics(Empty) returns (Metrics);
+  rpc GetMetric(Metric) returns (Metric);
+  rpc UpdateMetric(Metric) returns (Empty);
+  rpc UpdateMetrics(Metrics) returns (Empty);
+  rpc Ping(Empty) returns (Status);
+}
+
+message Metric {
+  MetricType type = 1;
+  string name = 2;
+  double gauge_value = 3;
+  int64 counter_value = 4;
+}
+
+message Metrics {
+  repeated Metric values = 1;
+}
+
+message Empty {}
+
+message Status {
+  string description = 1;
+}
