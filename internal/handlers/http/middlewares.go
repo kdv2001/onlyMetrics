@@ -324,10 +324,10 @@ func (w *WriterWithLogging) Header() http.Header {
 }
 
 // NewSubNetMiddleware создает Middleware для проверки принадлежности запрос клиента к подсети
-func NewSubNetMiddleware(cidr string) (func(handler http.Handler) http.Handler, error) {
-	_, ipNet, err := net.ParseCIDR(cidr)
+func NewSubNetMiddleware(trustedSubnet string) (func(handler http.Handler) http.Handler, error) {
+	_, ipNet, err := net.ParseCIDR(trustedSubnet)
 	if err != nil {
-		return nil, fmt.Errorf("error parse CIdr %w", err)
+		return nil, fmt.Errorf("error parse CIDR %w", err)
 	}
 
 	return func(next http.Handler) http.Handler {

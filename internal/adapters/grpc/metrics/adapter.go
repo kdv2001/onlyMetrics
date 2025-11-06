@@ -7,21 +7,22 @@ import (
 	pb "github.com/kdv2001/onlyMetrics/internal/gen/protogen/only_metrics/grpc"
 )
 
-// DomainToPB конвертирует доменную структуру в прото
-func DomainToPB(value domain.MetricValue) *pb.Metric {
+// DomainMetricToPB конвертирует доменную структуру в прото
+func DomainMetricToPB(value domain.MetricValue) *pb.Metric {
 	switch value.Type {
 	case domain.GaugeMetricType:
-		return &pb.Metric{
-			Type:       pb.MetricType_GAUGE_METRIC_TYPE,
-			Name:       value.Name,
-			GaugeValue: value.GaugeValue,
-		}
+		m := &pb.Metric{}
+		m.SetType(pb.MetricType_GAUGE_METRIC_TYPE)
+		m.SetName(value.Name)
+		m.SetGaugeValue(value.GaugeValue)
+
+		return m
 	case domain.CounterMetricType:
-		return &pb.Metric{
-			Type:         pb.MetricType_COUNTER_METRIC_TYPE,
-			Name:         value.Name,
-			CounterValue: value.CounterValue,
-		}
+		m := &pb.Metric{}
+		m.SetType(pb.MetricType_COUNTER_METRIC_TYPE)
+		m.SetName(value.Name)
+		m.SetCounterValue(value.CounterValue)
+		return m
 	}
 
 	return nil
@@ -29,18 +30,18 @@ func DomainToPB(value domain.MetricValue) *pb.Metric {
 
 // PBToDomain конвертирует прото структуру в доменную
 func PBToDomain(value *pb.Metric) (domain.MetricValue, error) {
-	switch value.Type {
+	switch value.GetType() {
 	case pb.MetricType_GAUGE_METRIC_TYPE:
 		return domain.MetricValue{
 			Type:       domain.GaugeMetricType,
-			Name:       value.Name,
-			GaugeValue: value.GaugeValue,
+			Name:       value.GetName(),
+			GaugeValue: value.GetGaugeValue(),
 		}, nil
 	case pb.MetricType_COUNTER_METRIC_TYPE:
 		return domain.MetricValue{
 			Type:         domain.CounterMetricType,
-			Name:         value.Name,
-			CounterValue: value.CounterValue,
+			Name:         value.GetName(),
+			CounterValue: value.GetCounterValue(),
 		}, nil
 	}
 

@@ -16,7 +16,7 @@ type flags struct {
 	CryptKey               string           `env:"KEY" flag:"k;;crypt request key" json:"key"`
 	SymmetricEncryptionKey string           `env:"CRYPTO_KEY" flag:"crypto-key;;symmetric encryption key" json:"symmetric_encryption_key"`
 	ConfigFilePath         string           `env:"CONFIG" flag:"config;;config file path"`
-	CIDR                   string           `env:"TRUSTED_SUBNET" flag:"t;;CIDR" json:"trusted_subnet"`
+	TrustedSubnet          string           `env:"TRUSTED_SUBNET" flag:"t;;TrustedSubnet" json:"trusted_subnet"`
 }
 
 func makeFlags() *flags {

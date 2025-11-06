@@ -24,4 +24,4 @@ generate-certs:
 generate:
 	protoc --go_out=. --go_opt=paths=import \
       --go-grpc_out=. --go-grpc_opt=paths=import \
-      api/onlyMetrics.proto
+      api/onlyMetrics.proto --go_opt=default_api_level=API_OPAQUE

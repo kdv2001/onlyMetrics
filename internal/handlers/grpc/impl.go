@@ -31,7 +31,7 @@ func NewHandlers(useCases useCases) *Handlers {
 }
 
 // GetAllMetrics обработчик для получения всех метрик.
-func (h *Handlers) GetAllMetrics(ctx context.Context, _ *pb.Empty) (*pb.Metrics, error) {
+func (h *Handlers) GetAllMetrics(ctx context.Context, _ *pb.GetAllMetricsReq) (*pb.GetAllMetricsResp, error) {
 	values, err := h.metricUseCases.GetAllMetrics(ctx)
 	if err != nil {
 		return nil, err
@@ -39,34 +39,38 @@ func (h *Handlers) GetAllMetrics(ctx context.Context, _ *pb.Empty) (*pb.Metrics,
 
 	res := make([]*pb.Metric, 0, len(values))
 	for _, v := range values {
-		res = append(res, metrics_adapter.DomainToPB(v))
+		res = append(res, metrics_adapter.DomainMetricToPB(v))
 	}
 
-	return &pb.Metrics{
-		Values: res,
-	}, nil
+	resp := &pb.GetAllMetricsResp{}
+	pbMetrics := &pb.Metrics{}
+	pbMetrics.SetValues(res)
+	resp.SetMetrics(pbMetrics)
+	return resp, nil
 }
 
 // GetMetric обработчик для получения метрики.
-func (h *Handlers) GetMetric(ctx context.Context, req *pb.Metric) (*pb.Metric, error) {
-	t, err := metrics_adapter.PBToDomainType(req.GetType())
+func (h *Handlers) GetMetric(ctx context.Context, req *pb.GetMetricReq) (*pb.GetMetricResp, error) {
+	t, err := metrics_adapter.PBToDomainType(req.GetMetric().GetType())
 	if err != nil {
 		return nil, err
 	}
 
-	val, err := h.metricUseCases.GetMetric(ctx, t, req.Name)
+	val, err := h.metricUseCases.GetMetric(ctx, t, req.GetMetric().GetName())
 	if err != nil {
 		return nil, err
 	}
 
-	res := metrics_adapter.DomainToPB(val)
+	res := metrics_adapter.DomainMetricToPB(val)
+	resp := &pb.GetMetricResp{}
+	resp.SetMetric(res)
 
-	return res, nil
+	return resp, nil
 }
 
 // UpdateMetric обработчик для обновления метрики.
-func (h *Handlers) UpdateMetric(ctx context.Context, req *pb.Metric) (*pb.Empty, error) {
-	r, err := metrics_adapter.PBToDomain(req)
+func (h *Handlers) UpdateMetric(ctx context.Context, req *pb.UpdateMetricReq) (*pb.UpdateMetricResp, error) {
+	r, err := metrics_adapter.PBToDomain(req.GetMetric())
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +84,9 @@ func (h *Handlers) UpdateMetric(ctx context.Context, req *pb.Metric) (*pb.Empty,
 }
 
 // UpdateMetrics обработчик для обновления нескольких метрик.
-func (h *Handlers) UpdateMetrics(ctx context.Context, req *pb.Metrics) (*pb.Empty, error) {
-	r := make([]domain.MetricValue, 0, len(req.GetValues()))
-	for _, v := range req.GetValues() {
+func (h *Handlers) UpdateMetrics(ctx context.Context, req *pb.UpdateMetricsReq) (*pb.UpdateMetricsResp, error) {
+	r := make([]domain.MetricValue, 0, len(req.GetMetrics().GetValues()))
+	for _, v := range req.GetMetrics().GetValues() {
 		vv, err := metrics_adapter.PBToDomain(v)
 		if err != nil {
 			return nil, err
@@ -98,10 +102,15 @@ func (h *Handlers) UpdateMetrics(ctx context.Context, req *pb.Metrics) (*pb.Empt
 }
 
 // Ping обработчик для проверки работоспособности сервиса.
-func (h *Handlers) Ping(ctx context.Context, _ *pb.Empty) (*pb.Status, error) {
+func (h *Handlers) Ping(ctx context.Context, _ *pb.PingReq) (*pb.PingResp, error) {
 	if err := h.metricUseCases.Ping(ctx); err != nil {
 		return nil, err
 	}
 
-	return nil, nil
+	s := &pb.Status{}
+	s.SetDescription("OK")
+	resp := &pb.PingResp{}
+	resp.SetStatus(s)
+
+	return resp, nil
 }

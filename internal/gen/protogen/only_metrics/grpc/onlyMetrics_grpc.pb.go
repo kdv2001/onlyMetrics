@@ -19,22 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OnlyMetrics_GetAllMetrics_FullMethodName = "/demo.OnlyMetrics/GetAllMetrics"
-	OnlyMetrics_GetMetric_FullMethodName     = "/demo.OnlyMetrics/GetMetric"
-	OnlyMetrics_UpdateMetric_FullMethodName  = "/demo.OnlyMetrics/UpdateMetric"
-	OnlyMetrics_UpdateMetrics_FullMethodName = "/demo.OnlyMetrics/UpdateMetrics"
-	OnlyMetrics_Ping_FullMethodName          = "/demo.OnlyMetrics/Ping"
+	OnlyMetrics_GetAllMetrics_FullMethodName = "/kdv2001.only_metrics.OnlyMetrics/GetAllMetrics"
+	OnlyMetrics_GetMetric_FullMethodName     = "/kdv2001.only_metrics.OnlyMetrics/GetMetric"
+	OnlyMetrics_UpdateMetric_FullMethodName  = "/kdv2001.only_metrics.OnlyMetrics/UpdateMetric"
+	OnlyMetrics_UpdateMetrics_FullMethodName = "/kdv2001.only_metrics.OnlyMetrics/UpdateMetrics"
+	OnlyMetrics_Ping_FullMethodName          = "/kdv2001.only_metrics.OnlyMetrics/Ping"
 )
 
 // OnlyMetricsClient is the client API for OnlyMetrics service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type OnlyMetricsClient interface {
-	GetAllMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error)
-	GetMetric(ctx context.Context, in *Metric, opts ...grpc.CallOption) (*Metric, error)
-	UpdateMetric(ctx context.Context, in *Metric, opts ...grpc.CallOption) (*Empty, error)
-	UpdateMetrics(ctx context.Context, in *Metrics, opts ...grpc.CallOption) (*Empty, error)
-	Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Status, error)
+	GetAllMetrics(ctx context.Context, in *GetAllMetricsReq, opts ...grpc.CallOption) (*GetAllMetricsResp, error)
+	GetMetric(ctx context.Context, in *GetMetricReq, opts ...grpc.CallOption) (*GetMetricResp, error)
+	UpdateMetric(ctx context.Context, in *UpdateMetricReq, opts ...grpc.CallOption) (*UpdateMetricResp, error)
+	UpdateMetrics(ctx context.Context, in *UpdateMetricsReq, opts ...grpc.CallOption) (*UpdateMetricsResp, error)
+	Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error)
 }
 
 type onlyMetricsClient struct {
@@ -45,9 +45,9 @@ func NewOnlyMetricsClient(cc grpc.ClientConnInterface) OnlyMetricsClient {
 	return &onlyMetricsClient{cc}
 }
 
-func (c *onlyMetricsClient) GetAllMetrics(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Metrics, error) {
+func (c *onlyMetricsClient) GetAllMetrics(ctx context.Context, in *GetAllMetricsReq, opts ...grpc.CallOption) (*GetAllMetricsResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Metrics)
+	out := new(GetAllMetricsResp)
 	err := c.cc.Invoke(ctx, OnlyMetrics_GetAllMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -55,9 +55,9 @@ func (c *onlyMetricsClient) GetAllMetrics(ctx context.Context, in *Empty, opts .
 	return out, nil
 }
 
-func (c *onlyMetricsClient) GetMetric(ctx context.Context, in *Metric, opts ...grpc.CallOption) (*Metric, error) {
+func (c *onlyMetricsClient) GetMetric(ctx context.Context, in *GetMetricReq, opts ...grpc.CallOption) (*GetMetricResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Metric)
+	out := new(GetMetricResp)
 	err := c.cc.Invoke(ctx, OnlyMetrics_GetMetric_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -65,9 +65,9 @@ func (c *onlyMetricsClient) GetMetric(ctx context.Context, in *Metric, opts ...g
 	return out, nil
 }
 
-func (c *onlyMetricsClient) UpdateMetric(ctx context.Context, in *Metric, opts ...grpc.CallOption) (*Empty, error) {
+func (c *onlyMetricsClient) UpdateMetric(ctx context.Context, in *UpdateMetricReq, opts ...grpc.CallOption) (*UpdateMetricResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(UpdateMetricResp)
 	err := c.cc.Invoke(ctx, OnlyMetrics_UpdateMetric_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -75,9 +75,9 @@ func (c *onlyMetricsClient) UpdateMetric(ctx context.Context, in *Metric, opts .
 	return out, nil
 }
 
-func (c *onlyMetricsClient) UpdateMetrics(ctx context.Context, in *Metrics, opts ...grpc.CallOption) (*Empty, error) {
+func (c *onlyMetricsClient) UpdateMetrics(ctx context.Context, in *UpdateMetricsReq, opts ...grpc.CallOption) (*UpdateMetricsResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(UpdateMetricsResp)
 	err := c.cc.Invoke(ctx, OnlyMetrics_UpdateMetrics_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -85,9 +85,9 @@ func (c *onlyMetricsClient) UpdateMetrics(ctx context.Context, in *Metrics, opts
 	return out, nil
 }
 
-func (c *onlyMetricsClient) Ping(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Status, error) {
+func (c *onlyMetricsClient) Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Status)
+	out := new(PingResp)
 	err := c.cc.Invoke(ctx, OnlyMetrics_Ping_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -99,11 +99,11 @@ func (c *onlyMetricsClient) Ping(ctx context.Context, in *Empty, opts ...grpc.Ca
 // All implementations must embed UnimplementedOnlyMetricsServer
 // for forward compatibility.
 type OnlyMetricsServer interface {
-	GetAllMetrics(context.Context, *Empty) (*Metrics, error)
-	GetMetric(context.Context, *Metric) (*Metric, error)
-	UpdateMetric(context.Context, *Metric) (*Empty, error)
-	UpdateMetrics(context.Context, *Metrics) (*Empty, error)
-	Ping(context.Context, *Empty) (*Status, error)
+	GetAllMetrics(context.Context, *GetAllMetricsReq) (*GetAllMetricsResp, error)
+	GetMetric(context.Context, *GetMetricReq) (*GetMetricResp, error)
+	UpdateMetric(context.Context, *UpdateMetricReq) (*UpdateMetricResp, error)
+	UpdateMetrics(context.Context, *UpdateMetricsReq) (*UpdateMetricsResp, error)
+	Ping(context.Context, *PingReq) (*PingResp, error)
 	mustEmbedUnimplementedOnlyMetricsServer()
 }
 
@@ -114,19 +114,19 @@ type OnlyMetricsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedOnlyMetricsServer struct{}
 
-func (UnimplementedOnlyMetricsServer) GetAllMetrics(context.Context, *Empty) (*Metrics, error) {
+func (UnimplementedOnlyMetricsServer) GetAllMetrics(context.Context, *GetAllMetricsReq) (*GetAllMetricsResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllMetrics not implemented")
 }
-func (UnimplementedOnlyMetricsServer) GetMetric(context.Context, *Metric) (*Metric, error) {
+func (UnimplementedOnlyMetricsServer) GetMetric(context.Context, *GetMetricReq) (*GetMetricResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetMetric not implemented")
 }
-func (UnimplementedOnlyMetricsServer) UpdateMetric(context.Context, *Metric) (*Empty, error) {
+func (UnimplementedOnlyMetricsServer) UpdateMetric(context.Context, *UpdateMetricReq) (*UpdateMetricResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateMetric not implemented")
 }
-func (UnimplementedOnlyMetricsServer) UpdateMetrics(context.Context, *Metrics) (*Empty, error) {
+func (UnimplementedOnlyMetricsServer) UpdateMetrics(context.Context, *UpdateMetricsReq) (*UpdateMetricsResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateMetrics not implemented")
 }
-func (UnimplementedOnlyMetricsServer) Ping(context.Context, *Empty) (*Status, error) {
+func (UnimplementedOnlyMetricsServer) Ping(context.Context, *PingReq) (*PingResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedOnlyMetricsServer) mustEmbedUnimplementedOnlyMetricsServer() {}
@@ -151,7 +151,7 @@ func RegisterOnlyMetricsServer(s grpc.ServiceRegistrar, srv OnlyMetricsServer) {
 }
 
 func _OnlyMetrics_GetAllMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(GetAllMetricsReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -163,13 +163,13 @@ func _OnlyMetrics_GetAllMetrics_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: OnlyMetrics_GetAllMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OnlyMetricsServer).GetAllMetrics(ctx, req.(*Empty))
+		return srv.(OnlyMetricsServer).GetAllMetrics(ctx, req.(*GetAllMetricsReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _OnlyMetrics_GetMetric_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Metric)
+	in := new(GetMetricReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -181,13 +181,13 @@ func _OnlyMetrics_GetMetric_Handler(srv interface{}, ctx context.Context, dec fu
 		FullMethod: OnlyMetrics_GetMetric_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OnlyMetricsServer).GetMetric(ctx, req.(*Metric))
+		return srv.(OnlyMetricsServer).GetMetric(ctx, req.(*GetMetricReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _OnlyMetrics_UpdateMetric_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Metric)
+	in := new(UpdateMetricReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -199,13 +199,13 @@ func _OnlyMetrics_UpdateMetric_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: OnlyMetrics_UpdateMetric_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OnlyMetricsServer).UpdateMetric(ctx, req.(*Metric))
+		return srv.(OnlyMetricsServer).UpdateMetric(ctx, req.(*UpdateMetricReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _OnlyMetrics_UpdateMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Metrics)
+	in := new(UpdateMetricsReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -217,13 +217,13 @@ func _OnlyMetrics_UpdateMetrics_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: OnlyMetrics_UpdateMetrics_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OnlyMetricsServer).UpdateMetrics(ctx, req.(*Metrics))
+		return srv.(OnlyMetricsServer).UpdateMetrics(ctx, req.(*UpdateMetricsReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _OnlyMetrics_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(PingReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func _OnlyMetrics_Ping_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: OnlyMetrics_Ping_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OnlyMetricsServer).Ping(ctx, req.(*Empty))
+		return srv.(OnlyMetricsServer).Ping(ctx, req.(*PingReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -244,7 +244,7 @@ func _OnlyMetrics_Ping_Handler(srv interface{}, ctx context.Context, dec func(in
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var OnlyMetrics_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "demo.OnlyMetrics",
+	ServiceName: "kdv2001.only_metrics.OnlyMetrics",
 	HandlerType: (*OnlyMetricsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

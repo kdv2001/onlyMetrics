@@ -137,10 +137,11 @@ func startGRPCServer(
 	errorChan chan error,
 	parsedFlags *flags,
 	handlers *serviceGRPC.Handlers,
-	sugarLogger *zap.SugaredLogger) error {
+	sugarLogger *zap.SugaredLogger,
+) error {
 	interceptors := make([]grpc.UnaryServerInterceptor, 0)
-	if parsedFlags.CIDR != "" {
-		subnet, err := serviceGRPC.NewSubNetInterceptor(parsedFlags.CIDR)
+	if parsedFlags.TrustedSubnet != "" {
+		subnet, err := serviceGRPC.NewSubNetInterceptor(parsedFlags.TrustedSubnet)
 		if err != nil {
 			return err
 		}
@@ -207,8 +208,8 @@ func startHTTPServer(
 		sericeHttp.ResponseMiddleware(),
 		sericeHttp.RequestMiddleware())
 
-	if parsedFlags.CIDR != "" {
-		mw, err := sericeHttp.NewSubNetMiddleware(parsedFlags.CIDR)
+	if parsedFlags.TrustedSubnet != "" {
+		mw, err := sericeHttp.NewSubNetMiddleware(parsedFlags.TrustedSubnet)
 		if err != nil {
 			return fmt.Errorf("failed to init ubNetMiddleware: %w", err)
 		}

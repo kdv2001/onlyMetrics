@@ -12,11 +12,8 @@ import (
 )
 
 type OnlyMetricsClient interface {
-	GetAllMetrics(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption) (*pb.Metrics, error)
-	GetMetric(ctx context.Context, in *pb.Metric, opts ...grpc.CallOption) (*pb.Metric, error)
-	UpdateMetric(ctx context.Context, in *pb.Metric, opts ...grpc.CallOption) (*pb.Empty, error)
-	UpdateMetrics(ctx context.Context, in *pb.Metrics, opts ...grpc.CallOption) (*pb.Empty, error)
-	Ping(ctx context.Context, in *pb.Empty, opts ...grpc.CallOption) (*pb.Status, error)
+	UpdateMetric(ctx context.Context, in *pb.UpdateMetricReq, opts ...grpc.CallOption) (*pb.UpdateMetricResp, error)
+	UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsReq, opts ...grpc.CallOption) (*pb.UpdateMetricsResp, error)
 }
 
 // Client клиент обертка над GRPC
@@ -42,11 +39,14 @@ func (c *Client) SendCounter(ctx context.Context, value domain.MetricValue) erro
 }
 
 func (c *Client) send(ctx context.Context, value domain.MetricValue) error {
-	req := metrics_adapter.DomainToPB(value)
-	if req == nil {
+	metrics := metrics_adapter.DomainMetricToPB(value)
+	if metrics == nil {
 		return fmt.Errorf("unknown metric, type: %v", value.Type)
 
 	}
+
+	req := &pb.UpdateMetricReq{}
+	req.SetMetric(metrics)
 
 	_, err := c.client.UpdateMetric(ctx, req)
 	if err != nil {
@@ -58,19 +58,22 @@ func (c *Client) send(ctx context.Context, value domain.MetricValue) error {
 
 // SendMetrics отправляет набор метрик.
 func (c *Client) SendMetrics(ctx context.Context, metrics []domain.MetricValue) error {
-	res := make([]*pb.Metric, 0, len(metrics))
+	pbMetrics := make([]*pb.Metric, 0, len(metrics))
 	for _, dm := range metrics {
-		pbM := metrics_adapter.DomainToPB(dm)
+		pbM := metrics_adapter.DomainMetricToPB(dm)
 		if pbM == nil {
 			return fmt.Errorf("unknown metric, type: %v", dm.Type)
 		}
 
-		res = append(res, pbM)
+		pbMetrics = append(pbMetrics, pbM)
 	}
 
-	_, err := c.client.UpdateMetrics(ctx, &pb.Metrics{
-		Values: res,
-	})
+	req := &pb.UpdateMetricsReq{}
+	reqMetrics := &pb.Metrics{}
+	reqMetrics.SetValues(pbMetrics)
+	req.SetMetrics(reqMetrics)
+
+	_, err := c.client.UpdateMetrics(ctx, req)
 	if err != nil {
 		return err
 	}

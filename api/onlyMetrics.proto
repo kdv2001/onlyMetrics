@@ -1,8 +1,7 @@
-syntax = "proto3";
+edition = "2023";
 
-package demo;
+package kdv2001.only_metrics;
 
-// TODO поменять пакет
 option go_package = "internal/gen/protogen/only_metrics/grpc";
 
 // MetricType тип метрики
@@ -13,26 +12,80 @@ enum MetricType {
 }
 
 service OnlyMetrics {
-  rpc GetAllMetrics(Empty) returns (Metrics);
-  rpc GetMetric(Metric) returns (Metric);
-  rpc UpdateMetric(Metric) returns (Empty);
-  rpc UpdateMetrics(Metrics) returns (Empty);
-  rpc Ping(Empty) returns (Status);
+  rpc GetAllMetrics(GetAllMetricsReq) returns (GetAllMetricsResp);
+  rpc GetMetric(GetMetricReq) returns (GetMetricResp);
+  rpc UpdateMetric(UpdateMetricReq) returns (UpdateMetricResp);
+  rpc UpdateMetrics(UpdateMetricsReq) returns (UpdateMetricsResp);
+  rpc Ping(PingReq) returns (PingResp);
 }
 
+// GetAllMetricsReq запрос получения всех значений метрик.
+message GetAllMetricsReq {}
+
+// GetAllMetricsResp ответ получения всех значений метрик.
+message GetAllMetricsResp {
+  // metrics - значения метрик.
+  Metrics metrics = 1;
+}
+
+// GetAllMetricsReq запрос получения значения метрики.
+message GetMetricReq {
+  // metric - входные параметры для получения метрики.
+  Metric metric = 1;
+}
+
+// GetMetricResp ответ получения значения метрики.
+message GetMetricResp {
+  // metric - значение метрики.
+  Metric metric = 1;
+}
+
+// UpdateMetricReq запрос для обновления значения метрики.
+message UpdateMetricReq {
+  // metric - значение метрики.
+  Metric metric = 1;
+}
+
+// UpdateMetricResp ответ обновления значения метрики.
+message UpdateMetricResp {}
+
+// UpdateMetricResp запрос обновления значении нескольких метрик.
+message UpdateMetricsReq {
+  // metrics - значения метрик.
+  Metrics metrics = 1;
+}
+
+// UpdateMetricsResp ответ обновления значений нескольких метрик.
+message UpdateMetricsResp {}
+
+// PingReq запрос состояния сервера.
+message PingReq {}
+
+// PingResp ответ состояния сервера.
+message PingResp {
+  Status status = 1;
+}
+
+// Metric поля метрики.
 message Metric {
+  // type - тип метрики.
   MetricType type = 1;
+  // name название метрики.
   string name = 2;
+  // gauge_value - значение метрики типа "градусник".
   double gauge_value = 3;
+  // counter_value - значение метрики типа "счетчик".
   int64 counter_value = 4;
 }
 
+// Metrics несколько метрик.
 message Metrics {
+  // values - значения метрик.
   repeated Metric values = 1;
 }
 
-message Empty {}
-
+// Status статус сервера.
 message Status {
+  // description - описание.
   string description = 1;
 }
