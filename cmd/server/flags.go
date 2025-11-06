@@ -8,6 +8,7 @@ import (
 
 type flags struct {
 	ServerAddr             string           `default:":8080" env:"ADDRESS" flag:"a;;The address to bind the server to" json:"address"`
+	GRPCServerAddr         string           `default:":8081" env:"GRPC_ADDRESS" flag:"g;;The address to bind the GRPC server to" json:"grpc_address"`
 	StoreInterval          *config.Duration `default:"300" env:"STORE_INTERVAL" flag:"i;;The interval to save data to file" json:"store_interval"`
 	FileStoragePath        string           `default:"data.txt" env:"FILE_STORAGE_PATH" flag:"f;;The address to metric file" json:"store_file"`
 	RestoreData            bool             `env:"RESTORE" flag:"r;;The flag to restore data from file" json:"restore"`
@@ -15,6 +16,7 @@ type flags struct {
 	CryptKey               string           `env:"KEY" flag:"k;;crypt request key" json:"key"`
 	SymmetricEncryptionKey string           `env:"CRYPTO_KEY" flag:"crypto-key;;symmetric encryption key" json:"symmetric_encryption_key"`
 	ConfigFilePath         string           `env:"CONFIG" flag:"config;;config file path"`
+	TrustedSubnet          string           `env:"TRUSTED_SUBNET" flag:"t;;TrustedSubnet" json:"trusted_subnet"`
 }
 
 func makeFlags() *flags {

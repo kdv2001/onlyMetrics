@@ -8,6 +8,7 @@ import (
 
 type flags struct {
 	ServerAddr             *config.URL      `env:"ADDRESS" flag:"a;;metric server address" default:"localhost:8080" json:"address"`
+	GRPCServerAddr         *config.URL      `env:"GRPC_ADDRESS" flag:"g;;metric grpc server address" default:"" json:"grpc_address"`
 	ReportInterval         *config.Duration `env:"REPORT_INTERVAL" flag:"r;;report interval Duration" default:"10" json:"report_interval"`
 	PollInterval           *config.Duration `env:"POLL_INTERVAL" flag:"p;;report poll Duration" default:"2" json:"poll_interval"`
 	CryptKey               string           `env:"KEY" flag:"k;;crypt request key" json:"key"`
@@ -19,6 +20,7 @@ type flags struct {
 func makeFlags() *flags {
 	return &flags{
 		ServerAddr:     new(config.URL),
+		GRPCServerAddr: new(config.URL),
 		ReportInterval: new(config.Duration),
 		PollInterval:   new(config.Duration),
 	}

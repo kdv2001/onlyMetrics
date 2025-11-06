@@ -6,13 +6,16 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/network"
 )
 
 // hashWriter реализация интерфейса writer для перехвата информации ответа, последующего вычисления хэша
@@ -45,7 +48,7 @@ func (c *hashWriter) Write(p []byte) (int, error) {
 	bufSHA := hh.Sum(nil)
 
 	str := hex.EncodeToString(bufSHA)
-	c.Header().Set(HashSHA256, str)
+	c.Header().Set(network.HashSHA256, str)
 
 	return c.w.Write(p)
 }
@@ -59,7 +62,7 @@ func (c *hashWriter) WriteHeader(statusCode int) {
 func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		f := func(w http.ResponseWriter, r *http.Request) {
-			hashHeader := r.Header.Get(HashSHA256)
+			hashHeader := r.Header.Get(network.HashSHA256)
 			if hashHeader == "" {
 				next.ServeHTTP(w, r)
 				return
@@ -106,8 +109,8 @@ func NewSha256Middleware(key string) func(handler http.Handler) http.Handler {
 
 // defaultAcceptedEncodingTypes поддерживаемы типы для компрессии
 var defaultAcceptedEncodingTypes = map[string]struct{}{
-	TextHTML:        {},
-	ApplicationJSON: {},
+	network.TextHTML:        {},
+	network.ApplicationJSON: {},
 }
 
 // GetDefaultAcceptedEncodingData возвращает стандартный типа для компрессии
@@ -123,7 +126,7 @@ type compressWriter struct {
 }
 
 func newCompressWriter(w http.ResponseWriter, h http.Header, acceptedEncodingData map[string]struct{}) *compressWriter {
-	values := h.Values(Accept)
+	values := h.Values(network.Accept)
 	accepted := false
 	for _, v := range values {
 		if _, isExist := acceptedEncodingData[v]; isExist {
@@ -139,13 +142,13 @@ func newCompressWriter(w http.ResponseWriter, h http.Header, acceptedEncodingDat
 	}
 
 	compressAlg := ""
-	if acceptEncodingValues := h.Values(AcceptEncoding); len(acceptEncodingValues) > 0 {
+	if acceptEncodingValues := h.Values(network.AcceptEncoding); len(acceptEncodingValues) > 0 {
 		compressAlg = acceptEncodingValues[0]
 	}
 
 	switch compressAlg {
-	case Gzip:
-		w.Header().Set(ContentEncoding, Gzip)
+	case network.Gzip:
+		w.Header().Set(network.ContentEncoding, network.Gzip)
 		cw := gzip.NewWriter(w)
 		return &compressWriter{
 			w:              w,
@@ -208,11 +211,11 @@ func CompressMiddleware(encodingTypes map[string]struct{}) func(handler http.Han
 func DecompressMiddleware() func(handler http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			val := r.Header.Get(ContentEncoding)
+			val := r.Header.Get(network.ContentEncoding)
 			var err error
 			var zr io.ReadCloser
 			switch val {
-			case Gzip:
+			case network.Gzip:
 				zr, err = gzip.NewReader(r.Body)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
@@ -318,4 +321,38 @@ func (w *WriterWithLogging) WriteHeader(statusCode int) {
 // Header ...
 func (w *WriterWithLogging) Header() http.Header {
 	return w.baseWriter.Header()
+}
+
+// NewSubNetMiddleware создает Middleware для проверки принадлежности запрос клиента к подсети
+func NewSubNetMiddleware(trustedSubnet string) (func(handler http.Handler) http.Handler, error) {
+	_, ipNet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil {
+		return nil, fmt.Errorf("error parse CIDR %w", err)
+	}
+
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			val := r.Header.Get(network.XRealIP)
+			if val == "" {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			inputIP := net.ParseIP(val)
+			if inputIP == nil {
+				http.Error(w, "invalid ip", http.StatusForbidden)
+				return
+			}
+
+			if !ipNet.Contains(inputIP) {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(fn)
+
+	}, nil
 }

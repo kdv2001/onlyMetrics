@@ -18,7 +18,8 @@ import (
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
 )
 
-type sendClient interface {
+// SendClient клиент для отправки значений метрик
+type SendClient interface {
 	SendGauge(ctx context.Context, value domain.MetricValue) error
 	SendCounter(ctx context.Context, value domain.MetricValue) error
 	SendMetrics(ctx context.Context, values []domain.MetricValue) error
@@ -30,14 +31,14 @@ type metricsClient interface {
 
 // UseCase объект, содержащий бизнес-логику обработки метрик.
 type UseCase struct {
-	sendClient    sendClient
+	sendClient    SendClient
 	metricsClient metricsClient
 	sendInterval  time.Duration
 	workerNums    int64
 }
 
 // NewUseCase создает объект бизнес логики.
-func NewUseCase(sendClient sendClient, metricsClient metricsClient,
+func NewUseCase(sendClient SendClient, metricsClient metricsClient,
 	sendInterval time.Duration, workerNums int64) *UseCase {
 	if workerNums == 0 {
 		workerNums = 1

@@ -3,18 +3,27 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"os/signal"
 	"path"
+	"sync"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	_ "github.com/kdv2001/onlyMetrics/docs"
+	pb "github.com/kdv2001/onlyMetrics/internal/gen/protogen/only_metrics/grpc"
+	serviceGRPC "github.com/kdv2001/onlyMetrics/internal/handlers/grpc"
 	sericeHttp "github.com/kdv2001/onlyMetrics/internal/handlers/http"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/memory"
 	"github.com/kdv2001/onlyMetrics/internal/storage/metrics/postgres"
@@ -29,7 +38,6 @@ func initService() error {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 	defer cancel()
-	graceFullShutDown := make(chan struct{})
 
 	parsedFlags, err := initFlags()
 	if err != nil {
@@ -63,25 +71,159 @@ func initService() error {
 		metricsStorage = memoryStorage
 	}
 
-	metricsUC := metrics.NewUseCases(metricsStorage)
-	httpHandlers := sericeHttp.NewHandlers(metricsUC)
-
-	chiMux := chi.NewMux()
 	log, err := zap.NewDevelopment()
 	if err != nil {
 		return fmt.Errorf("failed to init looger: %w", err)
+	}
+	sugarLogger := log.Sugar()
+
+	metricsUC := metrics.NewUseCases(metricsStorage)
+	httpHandlers := sericeHttp.NewHandlers(metricsUC)
+	grpcHandlers := serviceGRPC.NewHandlers(metricsUC)
+
+	wg := &sync.WaitGroup{}
+	errorChan := make(chan error)
+	err = startHTTPServer(
+		ctx,
+		wg,
+		errorChan,
+		parsedFlags,
+		httpHandlers,
+		sugarLogger)
+	if err != nil {
+		return err
+	}
+
+	err = startGRPCServer(
+		ctx,
+		wg,
+		errorChan,
+		parsedFlags,
+		grpcHandlers,
+		sugarLogger)
+	if err != nil {
+		return err
+	}
+
+	finalErrChan := make(chan error)
+	go func() {
+		var errs []error
+		internalErr := <-errorChan
+		errs = append(errs, internalErr)
+		cancel()
+
+		for internalErr = range errorChan {
+			errs = append(errs, internalErr)
+		}
+
+		finalErrChan <- errors.Join(errs...)
+	}()
+
+	wg.Wait()
+	close(errorChan)
+
+	err = <-finalErrChan
+	if err != nil {
+		return err
+	}
+	close(finalErrChan)
+
+	return nil
+}
+
+func startGRPCServer(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	errorChan chan error,
+	parsedFlags *flags,
+	handlers *serviceGRPC.Handlers,
+	sugarLogger *zap.SugaredLogger,
+) error {
+	interceptors := make([]grpc.UnaryServerInterceptor, 0)
+	if parsedFlags.TrustedSubnet != "" {
+		subnet, err := serviceGRPC.NewSubNetInterceptor(parsedFlags.TrustedSubnet)
+		if err != nil {
+			return err
+		}
+
+		interceptors = append(interceptors, subnet)
+	}
+
+	interceptors = append(interceptors,
+		serviceGRPC.AddLoggerToContextInterceptor(sugarLogger),
+		serviceGRPC.RequestInterceptor(),
+		serviceGRPC.ResponseInterceptor(),
+		serviceGRPC.NewErrorInterceptor())
+
+	credsOpt, err := getGRPCCreds(parsedFlags)
+	if err != nil {
+		return err
+	}
+
+	server := grpc.NewServer(
+		credsOpt,
+		grpc.ChainUnaryInterceptor(interceptors...),
+	)
+
+	pb.RegisterOnlyMetricsServer(server, handlers)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		server.GracefulStop()
+	}()
+
+	listen, err := net.Listen("tcp", parsedFlags.GRPCServerAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = server.Serve(listen)
+		if err != nil {
+			errorChan <- err
+		}
+		logger.Infof(ctx, "gRPC server stopped")
+	}()
+
+	logger.Infof(ctx, "serving grpc metrics on port %s", parsedFlags.GRPCServerAddr)
+
+	return nil
+}
+
+func startHTTPServer(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	errorChan chan error,
+	parsedFlags *flags,
+	httpHandlers *sericeHttp.Handlers,
+	sugarLogger *zap.SugaredLogger,
+) error {
+	chiMux := chi.NewMux()
+
+	chiMux.Use(
+		sericeHttp.ResponseMiddleware(),
+		sericeHttp.RequestMiddleware())
+
+	if parsedFlags.TrustedSubnet != "" {
+		mw, err := sericeHttp.NewSubNetMiddleware(parsedFlags.TrustedSubnet)
+		if err != nil {
+			return fmt.Errorf("failed to init ubNetMiddleware: %w", err)
+		}
+		chiMux.Use(mw)
+
 	}
 	if parsedFlags.CryptKey != "" {
 		chiMux.Use(sericeHttp.NewSha256Middleware(parsedFlags.CryptKey))
 	}
 
-	sugarLogger := log.Sugar()
 	chiMux.Use(
 		sericeHttp.CompressMiddleware(sericeHttp.GetDefaultAcceptedEncodingData()),
 		sericeHttp.DecompressMiddleware(),
-		sericeHttp.AddLoggerToContextMiddleware(sugarLogger),
-		sericeHttp.ResponseMiddleware(),
-		sericeHttp.RequestMiddleware())
+		sericeHttp.AddLoggerToContextMiddleware(sugarLogger))
 
 	chiMux.Get("/", httpHandlers.GetAllMetric)
 
@@ -116,42 +258,52 @@ func initService() error {
 
 	chiMux.Get("/swagger/*", httpSwagger.Handler())
 
-	logger.Infof(ctx, "serving metrics on port %s", parsedFlags.ServerAddr)
-
 	tlsConfig, err := getTLSConfig(parsedFlags.SymmetricEncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to init tls: %w", err)
 	}
 
-	server := http.Server{
+	server := &http.Server{
 		Handler:   chiMux,
 		Addr:      parsedFlags.ServerAddr,
 		TLSConfig: tlsConfig,
 	}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		<-ctx.Done()
 		shutDownErr := server.Shutdown(ctx)
 		if shutDownErr != nil {
 			sugarLogger.Errorf("failed to shut down http server: %v", shutDownErr)
 		}
-
-		close(graceFullShutDown)
 	}()
 
-	if tlsConfig != nil {
-		err = server.ListenAndServeTLS("", "")
-	} else {
-		err = server.ListenAndServe()
-	}
-	if err != nil {
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if tlsConfig != nil {
+			err = server.ListenAndServeTLS("", "")
+		} else {
+			err = server.ListenAndServe()
+		}
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				errorChan <- err
+			}
+		}
+		logger.Infof(ctx, "http server stopped")
+	}()
 
-	<-graceFullShutDown
+	logger.Infof(ctx, "serving http metrics on port %s", parsedFlags.ServerAddr)
 
 	return nil
 }
+
+const (
+	certificateName = "CERTIFICATE.pem"
+	privateKeyName  = "PRIVATE_KEY.pem"
+)
 
 func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
 	if privateKeyPath == "" {
@@ -159,8 +311,8 @@ func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
 	}
 
 	cert, err := tls.LoadX509KeyPair(
-		path.Join(privateKeyPath, "CERTIFICATE.pem"),
-		path.Join(privateKeyPath, "PRIVATE_KEY.pem"))
+		path.Join(privateKeyPath, certificateName),
+		path.Join(privateKeyPath, privateKeyName))
 	if err != nil {
 		return nil, fmt.Errorf("error reading server certificate: %w", err)
 	}
@@ -172,4 +324,20 @@ func getTLSConfig(privateKeyPath string) (*tls.Config, error) {
 	}
 
 	return tlsConfig, nil
+}
+
+func getGRPCCreds(parsedFlags *flags) (grpc.ServerOption, error) {
+	var credsOpt = grpc.Creds(insecure.NewCredentials())
+	if parsedFlags.SymmetricEncryptionKey == "" {
+		return credsOpt, nil
+	}
+
+	tlsConf, err := credentials.NewServerTLSFromFile(
+		path.Join(parsedFlags.SymmetricEncryptionKey, certificateName),
+		path.Join(parsedFlags.SymmetricEncryptionKey, privateKeyName))
+	if err != nil {
+		return nil, err
+	}
+
+	return grpc.Creds(tlsConf), nil
 }

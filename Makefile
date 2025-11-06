@@ -18,3 +18,10 @@ build: build-agent build-server
 
 generate-certs:
 	go run ./cmd/cert
+
+# go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+# go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+generate:
+	protoc --go_out=. --go_opt=paths=import \
+      --go-grpc_out=. --go-grpc_opt=paths=import \
+      api/onlyMetrics.proto --go_opt=default_api_level=API_OPAQUE

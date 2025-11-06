@@ -15,6 +15,7 @@ import (
 
 	"github.com/kdv2001/onlyMetrics/internal/domain"
 	"github.com/kdv2001/onlyMetrics/pkg/logger"
+	"github.com/kdv2001/onlyMetrics/pkg/network"
 )
 
 type useCases interface {
@@ -258,7 +259,7 @@ func (h *Handlers) GetAllMetric(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Set(ContentType, TextHTML)
+	w.Header().Set(network.ContentType, network.TextHTML)
 	strings.Join(resStrs, "\n")
 	resSTR := "<html><body>" + strings.Join(resStrs, "") + "</body></html>"
 	_, err = w.Write([]byte(resSTR))

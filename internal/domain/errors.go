@@ -7,4 +7,6 @@ var (
 	ErrNotFound = errors.New("not found")
 	// ErrResourceIsLocked ошибка попытки параллельного доступа к ресурсу
 	ErrResourceIsLocked = errors.New("resource is locked")
+	// ErrInvalidArgument ошибка невалидные данные
+	ErrInvalidArgument = errors.New("invalid argument")
 )

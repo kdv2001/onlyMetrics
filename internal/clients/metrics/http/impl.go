@@ -10,12 +10,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/kdv2001/onlyMetrics/internal/clients"
 	"github.com/kdv2001/onlyMetrics/internal/domain"
+	"github.com/kdv2001/onlyMetrics/pkg/network"
 )
 
 const retryNums = 3
@@ -84,6 +87,7 @@ type BodyClient struct {
 	client    httpClient
 	serverURL url.URL
 	hh        func([]byte) ([]byte, error)
+	hostIP    net.IP
 	withGzip  bool
 }
 
@@ -121,6 +125,13 @@ func WithSHA256Opt(key string) clientOption {
 func SetRequestScheme(scheme clients.Scheme) clientOption {
 	return func(c *BodyClient) {
 		c.serverURL.Scheme = scheme.String()
+	}
+}
+
+// SetRealIPHeader устанавливает X-Real-IP заголовок в запросах
+func SetRealIPHeader(ip net.IP) clientOption {
+	return func(c *BodyClient) {
+		c.hostIP = ip
 	}
 }
 
@@ -271,8 +282,11 @@ func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricVal
 		return err
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set(network.ContentType, network.ApplicationJSON)
+	req.Header.Set(network.ContentEncoding, network.Gzip)
+	if c.hostIP != nil {
+		req.Header.Set(network.XRealIP, c.hostIP.String())
+	}
 
 	if c.hh != nil {
 		bufSHA, err := c.hh(buf.Bytes())
@@ -280,7 +294,7 @@ func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricVal
 			return err
 		}
 		str := hex.EncodeToString(bufSHA)
-		req.Header.Set("HashSHA256", str)
+		req.Header.Set(network.HashSHA256, str)
 	}
 
 	var timeSleep time.Duration
@@ -294,10 +308,15 @@ func (c *BodyClient) SendMetrics(ctx context.Context, metrics []domain.MetricVal
 			_ = resp.Body.Close()
 		}()
 
+		respBody, _ := io.ReadAll(resp.Body)
 		switch resp.StatusCode {
 		case http.StatusLocked:
 			timeSleep = time.Duration(i*2+1) * time.Second
 			continue
+		case http.StatusBadRequest:
+			return fmt.Errorf("bad request: %v", string(respBody))
+		case http.StatusForbidden:
+			return fmt.Errorf("forbidden: %v", string(respBody))
 		case http.StatusOK:
 			return nil
 		default:
